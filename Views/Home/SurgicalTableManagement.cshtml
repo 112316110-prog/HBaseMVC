@@ -1,0 +1,1531 @@
+﻿@model List<HBaseMVC.Models.SurgicalTable>
+@using Microsoft.AspNetCore.Http
+
+@{
+    Layout = null;
+
+    ViewBag.Title = "手術台資料";
+    var tables =
+    Model
+    ?? new List<HBaseMVC.Models.SurgicalTable>();
+    string role =
+        Context.Session.GetString("Role") ?? "";
+
+    bool isAdmin =
+        role == "Admin";
+
+    bool isTeacher =
+        role == "Teacher" || role == "Admin";
+
+    bool isStudent =
+        role == "Student";
+
+    string roleDisplay = role switch
+    {
+        "Admin" => "管理員",
+        "Teacher" => "老師",
+        "Student" => "學生",
+        _ => "未知身分"
+    };
+
+    var cadavers =
+        ViewBag.Cadavers
+        as List<HBaseMVC.Models.Cadaver>
+        ?? new List<HBaseMVC.Models.Cadaver>();
+
+    var schedules =
+        ViewBag.ClassSchedules
+        as List<HBaseMVC.Models.ClassSchedule>
+        ?? new List<HBaseMVC.Models.ClassSchedule>();
+}
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+
+    <title>@ViewBag.Title</title>
+
+    <style>
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                background: #ffffff;
+                color: #212121;
+                font-family: "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
+            }
+
+            .page {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 28px;
+            }
+
+            .top {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid #e5e5e5;
+            }
+
+            .title {
+                font-size: 22px;
+                font-weight: 600;
+            }
+
+            .top-spacer {
+                flex: 1;
+            }
+
+            .card {
+                margin-bottom: 18px;
+                padding: 20px 22px;
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                border-radius: 16px;
+            }
+
+            .card-title {
+                margin-bottom: 16px;
+                font-size: 15px;
+                font-weight: 600;
+            }
+
+            .form-row {
+                display: flex;
+                align-items: end;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+
+            .fg {
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            label {
+                font-size: 12px;
+                color: #676767;
+            }
+
+            input,
+            select {
+                height: 38px;
+                min-width: 200px;
+                padding: 0 10px;
+                border: 1px solid #d4d4d4;
+                border-radius: 9px;
+                background: #f4f4f4;
+                color: #212121;
+                font: inherit;
+            }
+
+                input:focus,
+                select:focus {
+                    outline: none;
+                    border-color: #969696;
+                }
+
+            .btn {
+                min-height: 38px;
+                padding: 0 14px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border: 1px solid #d4d4d4;
+                border-radius: 9px;
+                background: #ffffff;
+                color: #212121;
+                font-size: 13px;
+                font-weight: 500;
+                text-decoration: none;
+                cursor: pointer;
+            }
+
+                .btn:hover {
+                    background: #f1f1f1;
+                }
+
+            .btn-primary {
+                background: #212121;
+                border-color: #212121;
+                color: #ffffff;
+            }
+
+                .btn-primary:hover {
+                    background: #000000;
+                }
+
+            .alert {
+                margin-bottom: 16px;
+                padding: 12px 14px;
+                border: 1px solid #e5e5e5;
+                border-radius: 10px;
+                background: #f7f7f8;
+            }
+
+            .table-wrap {
+                overflow-x: auto;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            th {
+                padding: 11px 12px;
+                background: #f7f7f8;
+                color: #676767;
+                border-bottom: 1px solid #e5e5e5;
+                text-align: left;
+                font-size: 13px;
+            }
+
+            td {
+                padding: 12px;
+                border-bottom: 1px solid #e5e5e5;
+                font-size: 14px;
+            }
+
+            tbody tr:hover {
+                background: #fafafa;
+            }
+
+            .status-active {
+                color: #10a37f;
+                font-weight: 600;
+            }
+
+            .status-disabled {
+                color: #969696;
+                font-weight: 600;
+            }
+
+            .empty {
+                padding: 30px;
+                text-align: center;
+                color: #969696;
+                background: #f7f7f8;
+                border-radius: 10px;
+            }
+
+
+
+            :root {
+                --sidebar-width: 260px;
+                --sidebar-bg: #f7f7f8;
+                --border: #e5e5e5;
+                --border2: #d4d4d4;
+                --text: #212121;
+                --text2: #676767;
+                --text3: #969696;
+                --accent: #10a37f;
+                --input-bg: #f4f4f4;
+            }
+
+            .shell {
+                min-height: 100vh;
+                background: #ffffff;
+            }
+
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: calc(var(--sidebar-width) * -1);
+                z-index: 200;
+                width: var(--sidebar-width);
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                padding: 12px;
+                background: var(--sidebar-bg);
+                border-right: 1px solid var(--border);
+                overflow-y: auto;
+                transition: left 0.22s ease, box-shadow 0.22s ease;
+            }
+
+                .sidebar.open {
+                    left: 0;
+                    box-shadow: 8px 0 30px rgba(0, 0, 0, 0.12);
+                }
+
+            .sidebar-brand {
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                padding: 8px 8px 18px;
+            }
+
+            .brand-icon {
+                width: 36px;
+                height: 36px;
+                display: grid;
+                place-items: center;
+                border-radius: 10px;
+                background: var(--accent);
+                color: white;
+                font-size: 18px;
+                font-weight: 600;
+            }
+
+            .brand-title {
+                color: var(--text);
+                font-size: 14px;
+                font-weight: 600;
+            }
+
+            .brand-subtitle {
+                margin-top: 1px;
+                color: var(--text3);
+                font-size: 11px;
+            }
+
+            .sidebar-section {
+                padding: 18px 10px 7px;
+                color: var(--text3);
+                font-size: 11px;
+                font-weight: 500;
+                letter-spacing: 0.8px;
+            }
+
+            .nav-item {
+                min-height: 42px;
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                padding: 9px 11px;
+                margin-bottom: 2px;
+                border: 0;
+                border-radius: 9px;
+                color: var(--text);
+                font-size: 14px;
+                font-weight: 400;
+                text-decoration: none;
+                cursor: pointer;
+                user-select: none;
+                transition: background 0.15s;
+            }
+
+                .nav-item:hover {
+                    background: #ececec;
+                    color: var(--text);
+                    text-decoration: none;
+                }
+
+                .nav-item.active {
+                    background: #e7e7e7;
+                    color: var(--text);
+                }
+
+            .nav-icon {
+                width: 18px;
+                height: 18px;
+                opacity: 0.75;
+                flex-shrink: 0;
+            }
+
+            .nav-item.active .nav-icon {
+                opacity: 1;
+            }
+
+            .sidebar-spacer {
+                flex: 1;
+            }
+
+            .account-card {
+                display: flex;
+                align-items: center;
+                gap: 9px;
+                padding: 12px 8px 4px;
+                margin-top: 14px;
+                border-top: 1px solid var(--border);
+            }
+
+            .account-avatar {
+                width: 34px;
+                height: 34px;
+                display: grid;
+                place-items: center;
+                border-radius: 50%;
+                background: #dedede;
+                color: #333;
+                font-size: 13px;
+                font-weight: 600;
+            }
+
+            .account-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .account-name {
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            .account-id {
+                overflow: hidden;
+                color: var(--text3);
+                font-size: 11px;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .account-logout {
+                color: var(--text2);
+                font-size: 12px;
+                text-decoration: none;
+            }
+
+                .account-logout:hover {
+                    color: #dc2626;
+                }
+
+            .sidebar-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 190;
+                display: none;
+                background: rgba(0, 0, 0, 0.28);
+            }
+
+                .sidebar-overlay.open {
+                    display: block;
+                }
+
+            body.sidebar-open {
+                overflow: hidden;
+            }
+
+            .main {
+                min-height: 100vh;
+                background: #ffffff;
+            }
+
+            .app-header {
+                position: sticky;
+                top: 0;
+                z-index: 50;
+                height: 58px;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 0 22px;
+                background: rgba(255, 255, 255, 0.92);
+                border-bottom: 1px solid var(--border);
+                backdrop-filter: blur(10px);
+            }
+
+            .mobile-menu-button {
+                width: 36px;
+                height: 36px;
+                display: grid;
+                place-items: center;
+                border: 0;
+                border-radius: 9px;
+                background: transparent;
+                color: var(--text);
+                font-size: 20px;
+                cursor: pointer;
+            }
+
+                .mobile-menu-button:hover {
+                    background: var(--input-bg);
+                }
+
+            .app-header-title {
+                font-size: 15px;
+                font-weight: 600;
+            }
+
+            .app-header-actions {
+                margin-left: auto;
+            }
+
+            .system-status {
+                display: flex;
+                align-items: center;
+                gap: 7px;
+                color: var(--text2);
+                font-size: 12px;
+            }
+
+            .status-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--accent);
+            }
+
+            /* 手術台資料已經是 Admin 首頁，因此頁面內不再放「返回首頁」按鈕 */
+            .top {
+                margin-top: 8px;
+            }
+
+            @@media (max-width: 768px) {
+                .page {
+                    padding: 20px 16px 40px;
+                }
+            }
+
+            /* ===== 與 Index_backup.cshtml 相同的側邊欄樣式 ===== */
+            :root {
+                --sidebar-bg: #f7f7f8;
+                --border: #e5e5e5;
+                --border2: #d4d4d4;
+                --text: #212121;
+                --text2: #676767;
+                --text3: #969696;
+                --accent: #10a37f;
+                --red: #dc2626;
+                --input-bg: #f4f4f4;
+                --sidebar-width: 260px;
+            }
+
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: calc(var(--sidebar-width) * -1);
+                z-index: 200;
+                width: var(--sidebar-width);
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                padding: 12px;
+                background: var(--sidebar-bg);
+                border-right: 1px solid var(--border);
+                overflow-y: auto;
+                transition: left 0.22s ease, box-shadow 0.22s ease;
+            }
+
+                .sidebar.open {
+                    left: 0;
+                    box-shadow: 8px 0 30px rgba(0,0,0,0.12);
+                }
+
+            .sidebar-section {
+                padding: 18px 10px 7px;
+                color: var(--text3);
+                font-size: 11px;
+                font-weight: 500;
+                letter-spacing: 0.8px;
+            }
+
+            .nav-item {
+                min-height: 42px;
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                padding: 9px 11px;
+                margin-bottom: 2px;
+                border: 0;
+                border-radius: 9px;
+                color: var(--text);
+                font-size: 14px;
+                font-weight: 400;
+                text-decoration: none;
+                cursor: pointer;
+                user-select: none;
+                transition: background 0.15s;
+            }
+
+                .nav-item:hover {
+                    background: #ececec;
+                    color: var(--text);
+                    text-decoration: none;
+                }
+
+                .nav-item.active {
+                    background: #e7e7e7;
+                    color: var(--text);
+                }
+
+            .nav-icon {
+                width: 18px;
+                height: 18px;
+                opacity: 0.75;
+                flex-shrink: 0;
+            }
+
+            .nav-item.active .nav-icon {
+                opacity: 1;
+            }
+
+            .sidebar-brand {
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                padding: 8px 8px 18px;
+            }
+
+            .brand-icon {
+                width: 36px;
+                height: 36px;
+                display: grid;
+                place-items: center;
+                border-radius: 10px;
+                background: var(--accent);
+                color: white;
+                font-size: 18px;
+                font-weight: 600;
+            }
+
+            .brand-title {
+                color: var(--text);
+                font-size: 14px;
+                font-weight: 600;
+            }
+
+            .brand-subtitle {
+                margin-top: 1px;
+                color: var(--text3);
+                font-size: 11px;
+            }
+
+            .sidebar-spacer {
+                flex: 1;
+            }
+
+            .account-card {
+                display: flex;
+                align-items: center;
+                gap: 9px;
+                padding: 12px 8px 4px;
+                margin-top: 14px;
+                border-top: 1px solid var(--border);
+            }
+
+            .account-avatar {
+                width: 34px;
+                height: 34px;
+                display: grid;
+                place-items: center;
+                border-radius: 50%;
+                background: #dedede;
+                color: #333;
+                font-size: 13px;
+                font-weight: 600;
+            }
+
+            .account-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .account-name {
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            .account-id {
+                overflow: hidden;
+                color: var(--text3);
+                font-size: 11px;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .account-logout {
+                color: var(--text2);
+                font-size: 12px;
+                text-decoration: none;
+            }
+
+                .account-logout:hover {
+                    color: var(--red);
+                }
+
+            .sidebar-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 190;
+                display: none;
+                background: rgba(0,0,0,.28);
+            }
+
+                .sidebar-overlay.open {
+                    display: block;
+                }
+
+            body.sidebar-open {
+                overflow: hidden;
+            }
+
+    
+            .new-chat-button {
+                min-height: 42px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 9px 11px;
+                margin-bottom: 8px;
+                border: 1px solid var(--border);
+                border-radius: 9px;
+                background: #ffffff;
+                color: var(--text);
+                font-size: 14px;
+                text-decoration: none;
+                cursor: pointer;
+            }
+
+                .new-chat-button:hover {
+                    background: #ececec;
+                }
+
+            .new-chat-plus {
+                font-size: 18px;
+                line-height: 1;
+            }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="shell">
+
+        <!-- ══════════════ SIDEBAR ══════════════ -->
+        <!-- ══════════════ SIDEBAR：與首頁同一組選單 ══════════════ -->
+        <nav class="sidebar" id="app-sidebar">
+
+            <div class="sidebar-brand">
+                <div class="brand-icon">P</div>
+
+                <div class="brand-text">
+                    <div class="brand-title">病理教學系統</div>
+                    <div class="brand-subtitle">Pathology AI</div>
+                </div>
+            </div>
+
+            @if (!isAdmin)
+            {
+                <a class="new-chat-button"
+                   href="@Url.Action("Index", "Home", new { panel = "ai" })"
+                   style="text-decoration:none;">
+                    <span class="new-chat-plus">＋</span>
+                    新增對話
+                </a>
+            }
+
+            <div class="sidebar-section">資料管理</div>
+
+            <a class="nav-item"
+               href="@Url.Action("Index", "Home", new { panel = "list" })"
+               style="text-decoration:none;">
+                <svg class="nav-icon"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.5"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                </svg>
+                資料列表
+            </a>
+
+            <a class="nav-item"
+               href="@Url.Action("Index", "Home", new { panel = "search" })"
+               style="text-decoration:none;">
+                <svg class="nav-icon"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.5"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803z" />
+                </svg>
+                搜尋影像
+            </a>
+
+            <a class="nav-item"
+               href="@Url.Action("MedicalRecordManagement", "Home")"
+               style="text-decoration:none;">
+                <svg class="nav-icon"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.5"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M9 12h6m-6 4h6m2.25 4.5h-10.5A2.25 2.25 0 014.5 18.25V5.75A2.25 2.25 0 016.75 3.5h7.5l5.25 5.25v9.5a2.25 2.25 0 01-2.25 2.25z" />
+                </svg>
+                病歷管理
+            </a>
+
+            <a class="nav-item active"
+               href="@Url.Action("SurgicalTableManagement", "Home")"
+               style="text-decoration:none;">
+                <svg class="nav-icon"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.5"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M4.5 7.5h15m-15 9h15M7.5 4.5v15m9-15v15" />
+                </svg>
+                手術台資料
+            </a>
+
+            @if (isAdmin)
+            {
+                <a class="nav-item"
+                   href="@Url.Action("Index", "Home", new { panel = "add" })"
+                   style="text-decoration:none;">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    新增大體老師資料
+                </a>
+            }
+
+            @if (isAdmin)
+            {
+                <a class="nav-item"
+                   href="@Url.Action("TeacherAccounts", "Home")"
+                   style="text-decoration:none;">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8M19 8v6M22 11h-6" />
+                    </svg>
+                    老師帳號管理
+                </a>
+
+                <a class="nav-item"
+                   href="@Url.Action("StudentAccounts", "Home")"
+                   style="text-decoration:none;">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    學生帳號管理
+                </a>
+            }
+
+            @if (isAdmin)
+            {
+                <a class="nav-item"
+                   href="@Url.Action("BackupManagement", "Home")"
+                   style="text-decoration:none;">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M4.5 6.75A2.25 2.25 0 016.75 4.5h10.5a2.25 2.25 0 012.25 2.25v10.5a2.25 2.25 0 01-2.25 2.25H6.75a2.25 2.25 0 01-2.25-2.25V6.75zM8 4.5v5h8v-5M8 19.5v-6h8v6" />
+                    </svg>
+                    備份管理
+                </a>
+            }
+
+            <div class="sidebar-section">教學功能</div>
+
+            @if (isStudent)
+            {
+                <a class="nav-item"
+                   href="@Url.Action("Quiz", "Home")"
+                   style="text-decoration:none;">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    測驗
+                </a>
+
+                <a class="nav-item"
+                   href="@Url.Action("QuizHistory", "Home")"
+                   style="text-decoration:none;">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    測驗歷史紀錄
+                </a>
+            }
+
+            @if (isTeacher)
+            {
+                <a class="nav-item"
+                   href="@Url.Action("QuizManage", "Home")"
+                   style="text-decoration:none;">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897L16.862 4.487zM19.5 7.125L16.875 4.5M18 13.5v4.125A2.625 2.625 0 0115.375 20.25H5.625A2.625 2.625 0 013 17.625V7.875A2.625 2.625 0 015.625 5.25H9.75" />
+                    </svg>
+                    出題測驗
+                </a>
+
+                <a class="nav-item"
+                   href="@Url.Action("QuizProgress", "Home")"
+                   style="text-decoration:none;">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8m10-1v6m3-3h-6" />
+                    </svg>
+                    學生作答狀況
+                </a>
+            }
+
+            @if (!isAdmin)
+            {
+                <a class="nav-item"
+                   href="@Url.Action("Index", "Home", new { panel = "ai" })"
+                   style="text-decoration:none;">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M8.625 3.75a3.375 3.375 0 016.75 0v.75h.75a3.375 3.375 0 013.375 3.375v8.25a3.375 3.375 0 01-3.375 3.375h-8.25A3.375 3.375 0 014.5 16.125v-8.25A3.375 3.375 0 017.875 4.5h.75v-.75z" />
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M9 10.5h.008v.008H9V10.5zm6 0h.008v.008H15V10.5zM9.75 15a3.75 3.75 0 004.5 0" />
+                    </svg>
+                    AI 助教
+                </a>
+            }
+
+            @if (isStudent)
+            {
+                <a class="nav-item"
+                   href="@Url.Action("DailyNotes", "Home")"
+                   style="text-decoration:none;">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M6.75 3.75h10.5A2.25 2.25 0 0119.5 6v12a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 18V6a2.25 2.25 0 012.25-2.25zM8.25 8.25h7.5M8.25 12h7.5M8.25 15.75h4.5" />
+                    </svg>
+                    課程筆記
+                </a>
+            }
+
+            <div class="sidebar-spacer"></div>
+
+            <div class="account-card">
+                <div class="account-avatar">
+                    @(isAdmin ? "管" : isTeacher ? "師" : "生")
+                </div>
+
+                <div class="account-info">
+                    <div class="account-name">
+                        @roleDisplay
+                    </div>
+
+                    <div class="account-id">
+                        @Context.Session.GetString("LoginId")
+                    </div>
+                </div>
+
+                <a class="account-logout"
+                   href="@Url.Action("Logout", "Home")">
+                    登出
+                </a>
+            </div>
+
+        </nav>
+
+        <div class="sidebar-overlay"
+             id="sidebar-overlay"
+             onclick="closeSidebar()">
+        </div>
+
+        <!-- ══════════════ MAIN ══════════════ -->
+        <main class="main">
+
+            <header class="app-header">
+
+                <button type="button"
+                        class="mobile-menu-button"
+                        onclick="toggleSidebar()"
+                        aria-label="開啟選單">
+                    ☰
+                </button>
+
+                <div class="app-header-title">
+                    手術台資料
+                </div>
+
+                <div class="app-header-actions">
+                    <span class="system-status">
+                        <span class="status-dot"></span>
+                        系統正常
+                    </span>
+                </div>
+
+            </header>
+
+            <div class="page">
+
+                <div class="top">
+
+                    <div class="title">
+                        手術台資料
+                    </div>
+
+                </div>
+
+
+                @if (TempData["Message"] != null)
+                {
+                    <div class="alert">
+                        @TempData["Message"]
+                    </div>
+                }
+
+
+                @* =========================
+           新增手術台
+           ========================= *@
+
+                @if (isAdmin)
+                {
+                    <div class="card">
+
+                        <div class="card-title">
+                            新增手術台
+                        </div>
+
+                        <form method="post"
+                              action="@Url.Action(
+                                                                                                                    "SaveSurgicalTable",
+                                                                                                                    "Home"
+                                                                                                                )">
+
+                            @Html.AntiForgeryToken()
+
+                            <div class="form-row">
+
+                                <div class="fg">
+
+                                    <label>
+                                        手術台編號
+                                    </label>
+
+                                    <input type="text"
+                                           name="tableNumber"
+                                           placeholder="例：1、7、A01"
+                                           required />
+
+                                </div>
+
+                                <div class="fg">
+
+                                    <label>
+                                        手術台名稱
+                                    </label>
+
+                                    <input type="text"
+                                           name="tableName"
+                                           placeholder="未輸入則自動產生" />
+
+                                </div>
+
+                                <button type="submit"
+                                        class="btn btn-primary">
+                                    ＋ 新增手術台
+                                </button>
+
+                            </div>
+
+                        </form>
+
+                    </div>
+                }
+
+
+                @* =========================
+           目前手術台
+           ========================= *@
+
+                <div class="card">
+
+                    <div class="card-title">
+                        目前手術台
+                    </div>
+
+                    @if (tables.Count == 0)
+                    {
+                        <div class="empty">
+                            目前尚未建立手術台。
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-wrap">
+
+                            <table>
+
+                                <thead>
+
+                                    <tr>
+
+                                        <th>
+                                            手術台編號
+                                        </th>
+
+                                        <th>
+                                            手術台名稱
+                                        </th>
+
+                                        <th>
+                                            狀態
+                                        </th>
+
+                                        @if (isAdmin)
+                                        {
+                                            <th>
+                                                功能
+                                            </th>
+                                        }
+
+                                    </tr>
+
+                                </thead>
+
+                                <tbody>
+
+                                    @foreach (var item in tables)
+                                    {
+                                        <tr>
+
+                                            <td>
+                                                @item.TableNumber
+                                            </td>
+
+                                            <td>
+                                                @item.TableName
+                                            </td>
+
+                                            <td>
+
+                                                @if (item.IsActive)
+                                                {
+                                                    <span class="status-active">
+                                                        啟用
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="status-disabled">
+                                                        停用
+                                                    </span>
+                                                }
+
+                                            </td>
+
+                                            @if (isAdmin)
+                                            {
+                                                <td>
+
+                                                    <form method="post"
+                                                          action="@Url.Action(
+                                                                                                                                                                                                                                    "ToggleSurgicalTable",
+                                                                                                                                                                                                                                    "Home"
+                                                                                                                                                                                                                                )"
+                                                          style="display:inline;">
+
+                                                        @Html.AntiForgeryToken()
+
+                                                        <input type="hidden"
+                                                               name="rowKey"
+                                                               value="@item.RowKey" />
+
+                                                        <button type="submit"
+                                                                class="btn">
+
+                                                            @(item.IsActive
+                                                                ? "停用"
+                                                                : "啟用")
+
+                                                        </button>
+
+                                                    </form>
+
+                                                </td>
+                                            }
+
+                                        </tr>
+                                    }
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+                    }
+
+                </div>
+
+
+                @* =========================
+           新增上課安排
+           ========================= *@
+
+                @if (isAdmin)
+                {
+                    <div class="card">
+
+                        <div class="card-title">
+                            新增上課安排
+                        </div>
+
+                        <form method="post"
+                              action="@Url.Action(
+                                                                                                                    "SaveClassSchedule",
+                                                                                                                    "Home"
+                                                                                                                )">
+
+                            @Html.AntiForgeryToken()
+
+                            <div class="form-row">
+
+                                <div class="fg">
+
+                                    <label>
+                                        上課日期
+                                    </label>
+
+                                    <input type="date"
+                                           name="classDate"
+                                           min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                                           required />
+
+                                </div>
+
+                                <div class="fg">
+
+                                    <label>
+                                        手術台
+                                    </label>
+
+                                    <select name="tableId"
+                                            required>
+
+                                        <option value="">
+                                            請選擇
+                                        </option>
+
+                                        @foreach (
+                                            var table
+                                            in tables.Where(x =>
+                                                x.IsActive))
+                                        {
+                                            <option value="@table.RowKey">
+                                                @table.TableNumber - @table.TableName
+                                            </option>
+                                        }
+
+                                    </select>
+
+                                </div>
+
+                                <div class="fg">
+
+                                    <label>
+                                        大體老師
+                                    </label>
+
+                                    <select name="cadaverRowKey"
+                                            required>
+
+                                        <option value="">
+                                            請選擇
+                                        </option>
+
+                                        @foreach (
+                                            var cadaver
+                                            in cadavers)
+                                        {
+                                            <option value="@cadaver.RowKey">
+                                                @cadaver.RowKey
+                                            </option>
+                                        }
+
+                                    </select>
+
+                                </div>
+
+                                <button type="submit"
+                                        class="btn btn-primary">
+                                    ＋ 新增安排
+                                </button>
+
+                            </div>
+
+                        </form>
+
+                    </div>
+                }
+
+
+                @* =========================
+           目前上課安排
+           ========================= *@
+
+                <div class="card">
+
+                    <div class="card-title">
+                        目前上課安排
+                    </div>
+
+                    @if (schedules.Count == 0)
+                    {
+                        <div class="empty">
+                            目前尚未建立上課安排。
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-wrap">
+
+                            <table>
+
+                                <thead>
+                                    <tr>
+                                        <th>上課日期</th>
+                                        <th>手術台</th>
+                                        <th>大體老師編號</th>
+
+                                        @if (isAdmin)
+                                        {
+                                            <th>功能</th>
+                                        }
+                                    </tr>
+                                </thead>
+                                <tbody>
+
+                                    @foreach (
+                                        var schedule
+                                        in schedules)
+                                    {
+                                        var table =
+                                            tables.FirstOrDefault(x =>
+                                                x.RowKey ==
+                                                schedule.TableId);
+
+                                        var cadaver =
+                                            cadavers.FirstOrDefault(x =>
+                                                x.RowKey ==
+                                                schedule.CadaverRowKey);
+
+                                        <tr>
+
+                                            <td>
+                                                @schedule.ClassDate
+                                            </td>
+
+                                            <td>
+
+                                                @if (table != null)
+                                                {
+                                                    <span>
+                                                        @table.TableNumber
+                                                        -
+                                                        @table.TableName
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span>
+                                                        @schedule.TableId
+                                                    </span>
+                                                }
+
+                                            </td>
+
+                                            <td>
+
+                                                @if (cadaver != null)
+                                                {
+                                                    <span>
+                                                        @cadaver.RowKey
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span>
+                                                        @schedule.CadaverRowKey
+                                                    </span>
+                                                }
+
+                                            </td>
+
+                                            @if (isAdmin)
+                                            {
+                                                <td>
+
+                                                    <form method="post"
+                                                          action="@Url.Action(
+                                                                                                                                                                                                            "DeleteClassSchedule",
+                                                                                                                                                                                                            "Home"
+                                                                                                                                                                                                        )"
+                                                          style="display:inline;">
+
+                                                        @Html.AntiForgeryToken()
+
+                                                        <input type="hidden"
+                                                               name="rowKey"
+                                                               value="@schedule.RowKey" />
+
+                                                        <button type="submit"
+                                                                class="btn"
+                                                                onclick="return confirm('確定要刪除此上課安排嗎？');">
+
+                                                            刪除
+
+                                                        </button>
+
+                                                    </form>
+
+                                                </td>
+                                            }
+
+                                        </tr>
+                                    }
+
+                                </tbody>
+                            </table>
+
+                        </div>
+                    }
+
+                </div>
+
+            </div>
+
+        </main>
+
+    </div>
+
+    <script>
+            function toggleSidebar() {
+                const sidebar =
+                    document.getElementById(
+                        'app-sidebar'
+                    );
+
+                const overlay =
+                    document.getElementById(
+                        'sidebar-overlay'
+                    );
+
+                if (!sidebar || !overlay) {
+                    return;
+                }
+
+                const willOpen =
+                    !sidebar.classList.contains(
+                        'open'
+                    );
+
+                sidebar.classList.toggle(
+                    'open',
+                    willOpen
+                );
+
+                overlay.classList.toggle(
+                    'open',
+                    willOpen
+                );
+
+                document.body.classList.toggle(
+                    'sidebar-open',
+                    willOpen
+                );
+            }
+
+            function closeSidebar() {
+                document
+                    .getElementById(
+                        'app-sidebar'
+                    )
+                    ?.classList.remove(
+                        'open'
+                    );
+
+                document
+                    .getElementById(
+                        'sidebar-overlay'
+                    )
+                    ?.classList.remove(
+                        'open'
+                    );
+
+                document.body.classList.remove(
+                    'sidebar-open'
+                );
+            }
+
+            document.addEventListener(
+                'keydown',
+                function(event) {
+                    if (event.key === 'Escape') {
+                        closeSidebar();
+                    }
+                }
+            );
+    </script>
+
+</body>
+
+</html>

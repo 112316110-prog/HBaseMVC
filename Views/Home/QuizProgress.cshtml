@@ -1,0 +1,687 @@
+﻿@using Microsoft.AspNetCore.Http
+@model List<HBaseMVC.Controllers.QuizStudentProgress>
+
+@{
+    Layout = null;
+
+    ViewBag.Title =
+        "學生作答狀況 — 病理教學系統";
+
+    int activeQuestionCount =
+        ViewBag.ActiveQuestionCount is int c
+            ? c
+            : 0;
+
+    string role =
+        Context.Session.GetString("Role")
+        ?? "";
+
+    bool isAdmin =
+        role == "Admin";
+
+    var quizVersions =
+        ViewBag.QuizProgressVersions
+            as List<HBaseMVC.Controllers.QuizProgressVersion>
+        ?? new List<HBaseMVC.Controllers.QuizProgressVersion>();
+
+    var selectedQuestions =
+        ViewBag.SelectedQuestions
+            as List<HBaseMVC.Controllers.QuizQuestionSnapshot>
+        ?? new List<HBaseMVC.Controllers.QuizQuestionSnapshot>();
+
+    string selectedQuizVersion =
+        ViewBag.SelectedQuizVersion?.ToString()
+        ?? "";
+
+    string selectedVersionName =
+        ViewBag.SelectedVersionName?.ToString()
+        ?? "";
+}
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+
+    <title>@ViewBag.Title</title>
+
+    <style>
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                background: #f4f6f9;
+                color: #2c3e50;
+                font-family: "Microsoft JhengHei", sans-serif;
+            }
+
+            .topbar {
+                height: 68px;
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                padding: 0 32px;
+                background: #fff;
+                border-bottom: 1px solid #dcdfe6;
+            }
+
+            .brand {
+                font-size: 28px;
+                font-weight: 700;
+            }
+
+            .spacer {
+                flex: 1;
+            }
+
+            .btn {
+                min-height: 38px;
+                padding: 0 16px;
+                border: 1px solid #cfd6e0;
+                border-radius: 8px;
+                background: #fff;
+                color: #2c3e50;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+            }
+
+                .btn:hover {
+                    background: #f8fafc;
+                }
+
+            .container {
+                max-width: 1100px;
+                margin: 0 auto;
+                padding: 34px 24px 70px;
+            }
+
+            .title {
+                font-size: 28px;
+                font-weight: 700;
+                margin-bottom: 6px;
+            }
+
+            .sub {
+                color: #7a8492;
+                margin-bottom: 22px;
+            }
+
+            /* ========================= */
+            /* 版本按鈕 */
+            /* ========================= */
+
+            .version-list {
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+                margin-bottom: 22px;
+            }
+
+            .version-btn {
+                min-height: 40px;
+                padding: 0 16px;
+                border: 1px solid #cfd6e0;
+                border-radius: 8px;
+                background: #fff;
+                color: #2c3e50;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                font-weight: 600;
+            }
+
+                .version-btn:hover {
+                    background: #f8fafc;
+                }
+
+                .version-btn.active {
+                    background: #2563eb;
+                    border-color: #2563eb;
+                    color: #fff;
+                }
+
+                .version-btn.test {
+                    border-style: dashed;
+                }
+
+            /* ========================= */
+            /* 題目 */
+            /* ========================= */
+
+            .question-box {
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-radius: 12px;
+                padding: 18px;
+                margin-bottom: 22px;
+            }
+
+            .question-box-title {
+                font-size: 18px;
+                font-weight: 700;
+                margin-bottom: 14px;
+            }
+
+            .question-row {
+                padding: 14px 0;
+                border-bottom: 1px solid #e5e7eb;
+            }
+
+                .question-row:last-child {
+                    border-bottom: 0;
+                }
+
+            .question-title {
+                font-weight: 700;
+                line-height: 1.6;
+                margin-bottom: 7px;
+            }
+
+            .question-options {
+                color: #64748b;
+                line-height: 1.8;
+            }
+
+            .question-answer {
+                color: #166534;
+                font-weight: 600;
+                margin-top: 7px;
+            }
+
+            .question-explanation {
+                margin-top: 5px;
+                color: #64748b;
+                line-height: 1.7;
+            }
+
+            /* ========================= */
+            /* 統計 */
+            /* ========================= */
+
+            .summary {
+                display: flex;
+                gap: 12px;
+                margin-bottom: 18px;
+                flex-wrap: wrap;
+            }
+
+            .chip {
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-radius: 999px;
+                padding: 8px 14px;
+            }
+
+            /* ========================= */
+            /* 學生表格 */
+            /* ========================= */
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                background: #fff;
+                border: 1px solid #dcdfe6;
+            }
+
+            th,
+            td {
+                padding: 13px 14px;
+                text-align: left;
+                border-bottom: 1px solid #e5e7eb;
+            }
+
+            th {
+                background: #f8fafc;
+                color: #475569;
+            }
+
+            tbody tr:hover {
+                background: #fafafa;
+            }
+
+            .status {
+                display: inline-block;
+                padding: 4px 10px;
+                border-radius: 999px;
+                font-size: 13px;
+                font-weight: 700;
+            }
+
+            .done {
+                background: #dcfce7;
+                color: #166534;
+            }
+
+            .pending {
+                background: #fee2e2;
+                color: #991b1b;
+            }
+
+            .empty {
+                padding: 40px;
+                text-align: center;
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-radius: 12px;
+                color: #7a8492;
+            }
+
+            @@media (max-width: 760px) {
+
+                .topbar {
+                    padding: 0 16px;
+                }
+
+                .brand {
+                    font-size: 22px;
+                }
+
+                .container {
+                    padding: 24px 14px 50px;
+                }
+
+                .version-list {
+                    flex-direction: column;
+                }
+
+                .version-btn {
+                    width: 100%;
+                }
+
+                table {
+                    display: block;
+                    overflow-x: auto;
+                }
+            }
+
+    </style>
+
+</head>
+
+<body>
+
+    <header class="topbar">
+
+        <div class="brand">
+            病理教學系統
+        </div>
+
+        <span>
+            學生作答狀況
+        </span>
+
+        <div class="spacer"></div>
+
+        <a class="btn"
+           href="@Url.Action(
+                          "QuizManage",
+                          "Home"
+                      )">
+
+            返回題庫
+
+        </a>
+
+        <a class="btn"
+           href="@(isAdmin
+                           ? Url.Action(
+                               "SurgicalTableManagement",
+                               "Home"
+                             )
+                       : Url.Action(
+                           "Index",
+                           "Home"
+                         ))">
+
+            返回首頁
+
+        </a>
+
+    </header>
+
+
+    <main class="container">
+
+        <div class="title">
+            學生作答狀況
+        </div>
+
+
+        <!-- =============================== -->
+        <!-- 測驗版本 -->
+        <!-- =============================== -->
+        @if (quizVersions.Count == 0)
+        {
+            <div class="empty">
+                目前沒有可查看的測驗版本。
+            </div>
+        }
+        else
+        {
+            <div class="version-list">
+
+                @foreach (
+                    var quizVersion
+                    in quizVersions)
+                {
+                    bool selected =
+                        string.Equals(
+                            quizVersion.QuizVersion,
+                            selectedQuizVersion,
+                            StringComparison.OrdinalIgnoreCase
+                        );
+
+                    <a class="
+                        version-btn
+                        @(selected
+                           ? "active"
+                           : "")
+                        @(quizVersion.IsTest
+                           ? "test"
+                           : "")"
+                       href="@Url.Action(
+                                                  "QuizProgress",
+                                                  "Home",
+                                                  new
+                                                  {
+                                                      version =
+                                                          quizVersion.QuizVersion
+                                                  })">
+
+                        @quizVersion.DisplayName
+
+                        （@quizVersion.Questions.Count 題）
+
+                    </a>
+                }
+
+            </div>
+        }
+
+
+        <!-- =============================== -->
+        <!-- 該版本題目 -->
+        <!-- =============================== -->
+        @if (selectedQuestions.Count > 0)
+        {
+            <div class="question-box">
+
+                <div class="question-box-title">
+
+                    @selectedVersionName 題目
+
+                </div>
+
+                @for (
+                    int i = 0;
+                    i < selectedQuestions.Count;
+                    i++)
+                {
+                    var q =
+                        selectedQuestions[i];
+
+                    <div class="question-row">
+
+                        <div class="question-title">
+
+                            @(i + 1).
+                            @q.QuestionText
+
+                        </div>
+
+                        <div class="question-options">
+
+                            A. @q.OptionA
+                            <br />
+
+                            B. @q.OptionB
+                            <br />
+
+                            C. @q.OptionC
+                            <br />
+
+                            D. @q.OptionD
+
+                        </div>
+
+                        <div class="question-answer">
+
+                            正確答案：
+                            @q.CorrectAnswer
+
+                        </div>
+
+                        @if (
+                            !string.IsNullOrWhiteSpace(
+                                q.Explanation))
+                        {
+                            <div class="question-explanation">
+
+                                解析：
+                                @q.Explanation
+
+                            </div>
+                        }
+
+                    </div>
+                }
+
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(
+                     selectedQuizVersion))
+        {
+            <div class="empty">
+                此測驗版本目前沒有可顯示的題目資料。
+            </div>
+        }
+
+
+        <!-- =============================== -->
+        <!-- 目前選擇版本 -->
+        <!-- =============================== -->
+        @if (!string.IsNullOrWhiteSpace(
+                        selectedVersionName))
+        {
+            <div class="sub">
+
+                @selectedVersionName，
+                共 @activeQuestionCount 題。
+
+            </div>
+        }
+
+
+        @{
+            int doneCount =
+                Model?.Count(
+                    x => x.HasAnswered)
+                ?? 0;
+
+            int pendingCount =
+                Model?.Count(
+                    x => !x.HasAnswered)
+                ?? 0;
+        }
+
+
+        <!-- =============================== -->
+        <!-- 作答統計 -->
+        <!-- =============================== -->
+
+        <div class="summary">
+
+            <div class="chip">
+                已作答：
+                @doneCount 人
+            </div>
+
+            <div class="chip">
+                未作答：
+                @pendingCount 人
+            </div>
+
+            <div class="chip">
+                學生總數：
+                @(Model?.Count ?? 0) 人
+            </div>
+
+        </div>
+
+
+        <!-- =============================== -->
+        <!-- 學生作答紀錄 -->
+        <!-- =============================== -->
+        @if (
+                    Model == null ||
+                    Model.Count == 0)
+        {
+            <div class="empty">
+
+                目前沒有學生帳號。
+
+            </div>
+        }
+        else
+        {
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            學生帳號
+                        </th>
+
+                        <th>
+                            狀態
+                        </th>
+
+                        <th>
+                            分數
+                        </th>
+
+                        <th>
+                            作答時間
+                        </th>
+
+                        <th>
+                            明細
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    @foreach (
+                        var item
+                        in Model)
+                    {
+                        <tr>
+
+                            <td>
+                                @item.StudentId
+                            </td>
+
+                            <td>
+
+                                @if (item.HasAnswered)
+                                {
+                                    <span class="
+                                        status
+                                        done">
+
+                                        已作答
+
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="
+                                        status
+                                        pending">
+
+                                        未作答
+
+                                    </span>
+                                }
+
+                            </td>
+
+                            <td>
+
+                                @(
+                                    item.HasAnswered
+                                        ? $"{item.Score} / {item.Total}"
+                                        : "—"
+                                )
+
+                            </td>
+
+                            <td>
+
+                                @(
+                                    item.HasAnswered
+                                        ? item.SubmittedAt
+                                        : "—"
+                                )
+
+                            </td>
+
+                            <td>
+
+                                @if (item.HasAnswered)
+                                {
+                                    <a class="btn"
+                                       href="@Url.Action(
+                                                                                  "QuizAttemptDetail",
+                                                                                  "Home",
+                                                                                  new
+                                                                                  {
+                                                                                      attemptId =
+                                                                                          item.AttemptId
+                                                                                  })">
+
+                                        查看作答
+
+                                    </a>
+                                }
+                                else
+                                {
+                                    <span style="
+                                        color:#94a3b8;">
+
+                                        尚無紀錄
+
+                                    </span>
+                                }
+
+                            </td>
+
+                        </tr>
+                    }
+
+                </tbody>
+
+            </table>
+        }
+
+    </main>
+
+</body>
+
+</html>

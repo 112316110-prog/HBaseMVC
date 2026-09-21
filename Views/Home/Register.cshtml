@@ -1,0 +1,314 @@
+﻿@{
+    Layout = null;
+    ViewBag.Title = "學生註冊 — 病理教學系統";
+}
+
+<!DOCTYPE html>
+
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+
+    <title>@ViewBag.Title</title>
+
+    <style>
+            body {
+                margin: 0;
+                min-height: 100vh;
+                background: #ffffff;
+                font-family: "Microsoft JhengHei", sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #212121;
+            }
+
+            .box {
+                width: 420px;
+                max-width: calc(100% - 32px);
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                border-radius: 16px;
+                padding: 32px;
+                box-sizing: border-box;
+                box-shadow: none;
+            }
+
+            .title {
+                margin-bottom: 6px;
+                text-align: center;
+                color: #212121;
+                font-size: 30px;
+                font-weight: 700;
+            }
+
+            .sub {
+                margin-bottom: 24px;
+                text-align: center;
+                color: #676767;
+            }
+
+            .role-card {
+                margin-bottom: 18px;
+                padding: 14px;
+                border: 1px solid #d4d4d4;
+                border-radius: 10px;
+                background: #f7f7f8;
+                color: #212121;
+                text-align: center;
+                font-weight: 700;
+            }
+
+            .fg {
+                margin-bottom: 14px;
+            }
+
+                .fg label {
+                    display: block;
+                    margin-bottom: 6px;
+                    font-size: 14px;
+                }
+
+                .fg input {
+                    width: 100%;
+                    height: 38px;
+                    padding: 0 10px;
+                    border: 1px solid #d4d4d4;
+                    border-radius: 9px;
+                    box-sizing: border-box;
+                    background: #f4f4f4;
+                    color: #212121;
+                    font-family: inherit;
+                    font-size: 15px;
+                }
+
+                    .fg input:focus {
+                        outline: none;
+                        border-color: #969696;
+                        box-shadow: none;
+                    }
+
+            .captcha-box {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+                .captcha-box input {
+                    flex: 1;
+                    min-width: 0;
+                }
+
+            .captcha-code {
+                min-width: 110px;
+                height: 38px;
+                border: 1px solid #d4d4d4;
+                border-radius: 9px;
+                background: #f4f4f4;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #212121;
+                font-size: 20px;
+                font-weight: 700;
+                letter-spacing: 3px;
+                user-select: none;
+            }
+
+            .btn {
+                width: 100%;
+                height: 42px;
+                margin-top: 8px;
+                border: none;
+                border-radius: 9px;
+                background: #212121;
+                color: #ffffff;
+                font-family: inherit;
+                font-size: 16px;
+                cursor: pointer;
+            }
+
+                .btn:hover {
+                    background: #000000;
+                }
+
+            .alert {
+                margin-bottom: 16px;
+                padding: 10px;
+                border: 1px solid #fecaca;
+                border-radius: 6px;
+                background: #fee2e2;
+                color: #991b1b;
+                font-size: 14px;
+            }
+
+            .notice {
+                margin-top: 14px;
+                padding: 10px 12px;
+                border: 1px solid #e5e5e5;
+                border-radius: 10px;
+                background: #f7f7f8;
+                color: #676767;
+                font-size: 13px;
+                line-height: 1.6;
+            }
+
+            .link-row {
+                margin-top: 18px;
+                text-align: center;
+                font-size: 14px;
+            }
+
+                .link-row a {
+                    color: #212121;
+                    text-decoration: none;
+                    font-weight: 500;
+                }
+
+                    .link-row a:hover {
+                        text-decoration: underline;
+                    }
+
+            @@media (max-width: 520px) {
+                body {
+                    align-items: flex-start;
+                    padding: 20px 0;
+                }
+
+                .box {
+                    padding: 24px 20px;
+                }
+
+                .captcha-box {
+                    align-items: stretch;
+                    flex-direction: column;
+                }
+
+                .captcha-code {
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+            }
+    </style>
+
+</head>
+
+<body>
+    <div class="box">
+
+        <div class="title">
+            學生帳號註冊
+        </div>
+
+        <div class="sub">
+            請使用學生學號建立帳號
+        </div>
+
+        @if (TempData["Message"] != null)
+        {
+            <div class="alert">
+                @TempData["Message"]
+            </div>
+        }
+
+        <form method="post"
+              action="@Url.Action("Register", "Home")">
+
+            @Html.AntiForgeryToken()
+
+            <input type="hidden"
+                   name="role"
+                   value="Student" />
+
+            <div class="role-card">
+                學生帳號
+            </div>
+
+            <div class="fg">
+                <label for="loginId">
+                    學生學號
+                </label>
+
+                <input id="loginId"
+                       type="text"
+                       name="loginId"
+                       inputmode="numeric"
+                       pattern="[0-9]+"
+                       placeholder="請輸入學生學號"
+                       autocomplete="username"
+                       required />
+            </div>
+
+            <div class="fg">
+                <label for="password">
+                    密碼
+                </label>
+
+                <input id="password"
+                       type="password"
+                       name="password"
+                       minlength="8"
+                       placeholder="至少 8 個字元"
+                       autocomplete="new-password"
+                       required />
+            </div>
+
+            <div class="fg">
+                <label for="confirmPassword">
+                    確認密碼
+                </label>
+
+                <input id="confirmPassword"
+                       type="password"
+                       name="confirmPassword"
+                       minlength="8"
+                       placeholder="再次輸入密碼"
+                       autocomplete="new-password"
+                       required />
+            </div>
+
+            <div class="fg">
+                <label for="captcha">
+                    隨機驗證碼
+                </label>
+
+                <div class="captcha-box">
+
+                    <div class="captcha-code">
+                        @ViewBag.Captcha
+                    </div>
+
+                    <input id="captcha"
+                           type="text"
+                           name="captcha"
+                           placeholder="輸入驗證碼"
+                           autocomplete="off"
+                           required />
+                </div>
+            </div>
+
+            <button class="btn"
+                    type="submit">
+                註冊學生帳號
+            </button>
+        </form>
+
+        <div class="notice">
+            老師帳號無法由公開註冊頁建立，必須由系統管理員於「老師帳號管理」頁面新增。
+        </div>
+
+        <div class="link-row">
+            已經有帳號？
+
+            <a href="@Url.Action("Login", "Home")">
+                回登入頁
+            </a>
+        </div>
+
+    </div>
+
+</body>
+</html>

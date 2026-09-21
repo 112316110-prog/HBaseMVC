@@ -1,0 +1,273 @@
+﻿@{
+    Layout = null;
+    ViewBag.Title = "備份管理";
+}
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+
+    <title>@ViewBag.Title</title>
+
+    <style>
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                background: #ffffff;
+                color: #212121;
+                font-family: "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
+            }
+
+            .page {
+                max-width: 1000px;
+                margin: 0 auto;
+                padding: 28px;
+            }
+
+            .top {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid #e5e5e5;
+            }
+
+            .title {
+                font-size: 22px;
+                font-weight: 600;
+            }
+
+            .top-spacer {
+                flex: 1;
+            }
+
+            .card {
+                margin-bottom: 18px;
+                padding: 20px 22px;
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                border-radius: 16px;
+            }
+
+            .card-title {
+                margin-bottom: 8px;
+                font-size: 18px;
+                font-weight: 600;
+            }
+
+            .card-sub {
+                margin-bottom: 18px;
+                color: #676767;
+                font-size: 14px;
+                line-height: 1.7;
+            }
+
+            .btn {
+                min-height: 38px;
+                padding: 0 14px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border: 1px solid #d4d4d4;
+                border-radius: 9px;
+                background: #ffffff;
+                color: #212121;
+                font-size: 13px;
+                font-weight: 500;
+                text-decoration: none;
+                cursor: pointer;
+            }
+
+                .btn:hover {
+                    background: #f1f1f1;
+                }
+
+            .btn-primary {
+                background: #212121;
+                border-color: #212121;
+                color: #ffffff;
+            }
+
+                .btn-primary:hover {
+                    background: #000000;
+                }
+
+            .btn-danger {
+                border-color: #ef4444;
+                color: #dc2626;
+            }
+
+                .btn-danger:hover {
+                    background: #fef2f2;
+                }
+
+            .alert {
+                margin-bottom: 16px;
+                padding: 12px 14px;
+                border: 1px solid #e5e5e5;
+                border-radius: 10px;
+                background: #f7f7f8;
+            }
+
+            .form-row {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+
+            input[type="file"] {
+                min-width: 320px;
+                padding: 9px 10px;
+                border: 1px solid #d4d4d4;
+                border-radius: 9px;
+                background: #f4f4f4;
+            }
+
+            .warning {
+                margin-top: 14px;
+                padding: 12px 14px;
+                border-left: 4px solid #dc2626;
+                background: #fef2f2;
+                color: #991b1b;
+                border-radius: 8px;
+                font-size: 14px;
+                line-height: 1.7;
+            }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="page">
+
+        <div class="top">
+
+            <div class="title">
+                備份管理
+            </div>
+
+            <div class="top-spacer"></div>
+
+            <a class="btn"
+               href="@Url.Action("SurgicalTableManagement", "Home")">
+                返回首頁
+            </a>
+
+        </div>
+
+
+        @if (TempData["Message"] != null)
+        {
+            <div class="alert">
+                @TempData["Message"]
+            </div>
+        }
+
+
+        <div class="card">
+
+            <div class="card-title">
+                建立完整備份
+            </div>
+
+            <div class="card-sub">
+
+                將目前系統中的 HBase 資料建立成完整備份檔，
+                建議將下載後的備份檔另存至外接硬碟、
+                NAS 或其他電腦，以避免本機故障造成資料遺失。
+
+            </div>
+
+            <form method="post"
+                  action="@Url.Action(
+                                      "DownloadDatabaseBackup",
+                                      "Home"
+                                  )">
+
+                @Html.AntiForgeryToken()
+
+                <button type="submit"
+                        class="btn btn-primary">
+
+                    建立並下載完整備份
+
+                </button>
+
+            </form>
+
+        </div>
+
+
+        <div class="card">
+
+            <div class="card-title">
+                恢復資料庫
+            </div>
+
+            <div class="card-sub">
+
+                使用先前建立的完整備份檔恢復系統資料。
+
+            </div>
+
+            <form method="post"
+                  enctype="multipart/form-data"
+                  action="@Url.Action(
+                                      "RestoreDatabaseBackup",
+                                      "Home"
+                                  )">
+
+                @Html.AntiForgeryToken()
+
+                <div class="form-row">
+
+                    <input type="file"
+                           name="backupFile"
+                           accept=".zip,application/zip"
+                           required />
+
+                    <button type="submit"
+                            class="btn btn-danger"
+                            onclick="
+                        return confirm(
+                        '恢復資料庫將覆蓋目前資料，確定要繼續嗎？'
+                        );
+                        ">
+
+                        恢復資料庫
+
+                    </button>
+
+                </div>
+
+            </form>
+
+            <div class="warning">
+
+                注意：恢復資料庫屬於高風險操作。
+                系統將使用備份檔中的資料取代目前資料，
+                請確認備份檔正確後再執行。
+
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>

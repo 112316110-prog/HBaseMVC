@@ -1,0 +1,646 @@
+﻿@using Microsoft.AspNetCore.Http
+@model List<HBaseMVC.Models.UserAccount>
+
+@{
+    Layout = null;
+    ViewBag.Title = "老師帳號管理 — 病理教學系統";
+
+    string loginId =
+        Context.Session.GetString("LoginId") ?? "";
+}
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+
+    <title>@ViewBag.Title</title>
+
+    <style>
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                min-height: 100vh;
+                background: #ffffff;
+                color: #212121;
+                font-family: "Microsoft JhengHei", sans-serif;
+            }
+
+            .topbar {
+                height: 72px;
+                padding: 0 32px;
+                background: #ffffff;
+                border-bottom: 1px solid #e5e5e5;
+                display: flex;
+                align-items: center;
+                gap: 16px;
+            }
+
+            .topbar-title {
+                font-size: 26px;
+                font-weight: 700;
+                color: #212121;
+            }
+
+            .topbar-space {
+                flex: 1;
+            }
+
+            .admin-info {
+                color: #6b7280;
+                font-size: 14px;
+            }
+
+            .back-link {
+                height: 38px;
+                padding: 0 16px;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                color: #374151;
+                background: #ffffff;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+            }
+
+                .back-link:hover {
+                    background: #f1f1f1;
+                    border-color: #c7c7c7;
+                    color: #212121;
+                }
+
+            .page {
+                max-width: 1100px;
+                margin: 0 auto;
+                padding: 32px 24px 60px;
+            }
+
+            .page-header {
+                margin-bottom: 24px;
+            }
+
+            .page-title {
+                margin: 0 0 6px;
+                font-size: 30px;
+                color: #1f2937;
+            }
+
+            .page-sub {
+                margin: 0;
+                color: #6b7280;
+                font-size: 14px;
+            }
+
+            .alert {
+                margin-bottom: 20px;
+                padding: 12px 16px;
+                border-radius: 7px;
+                font-size: 14px;
+            }
+
+            .alert-success {
+                color: #166534;
+                background: #dcfce7;
+                border: 1px solid #bbf7d0;
+            }
+
+            .alert-error {
+                color: #991b1b;
+                background: #fee2e2;
+                border: 1px solid #fecaca;
+            }
+
+            .layout {
+                display: grid;
+                grid-template-columns: 380px 1fr;
+                gap: 24px;
+                align-items: start;
+            }
+
+            .card {
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                border-radius: 16px;
+                padding: 24px;
+                box-shadow: none;
+            }
+
+            .card-title {
+                margin: 0 0 5px;
+                font-size: 21px;
+                color: #212121;
+            }
+
+            .card-sub {
+                margin: 0 0 22px;
+                color: #6b7280;
+                font-size: 13px;
+            }
+
+            .fg {
+                margin-bottom: 15px;
+            }
+
+                .fg label {
+                    display: block;
+                    margin-bottom: 6px;
+                    color: #374151;
+                    font-size: 14px;
+                }
+
+                .fg input {
+                    width: 100%;
+                    height: 40px;
+                    padding: 0 11px;
+                    border: 1px solid #d4d4d4;
+                    border-radius: 9px;
+                    background: #f4f4f4;
+                    color: #212121;
+                    font-size: 15px;
+                    font-family: inherit;
+                }
+
+                    .fg input:focus {
+                        outline: none;
+                        border-color: #969696;
+                        box-shadow: none;
+                    }
+
+            .captcha-row {
+                display: grid;
+                grid-template-columns: 120px 1fr;
+                gap: 10px;
+            }
+
+            .captcha-code {
+                height: 40px;
+                border: 1px solid #d4d4d4;
+                border-radius: 9px;
+                background: #f4f4f4;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #212121;
+                font-size: 19px;
+                font-weight: 700;
+                letter-spacing: 3px;
+                user-select: none;
+            }
+
+            .btn {
+                height: 40px;
+                padding: 0 16px;
+                border: none;
+                border-radius: 6px;
+                font-family: inherit;
+                font-size: 14px;
+                cursor: pointer;
+            }
+
+            .btn-primary {
+                width: 100%;
+                color: #ffffff;
+                background: #212121;
+            }
+
+                .btn-primary:hover {
+                    background: #000000;
+                }
+
+            .btn-warning {
+                color: #92400e;
+                background: #fef3c7;
+                border: 1px solid #fde68a;
+            }
+
+                .btn-warning:hover {
+                    background: #fde68a;
+                }
+
+            .btn-danger {
+                color: #991b1b;
+                background: #fee2e2;
+                border: 1px solid #fecaca;
+            }
+
+                .btn-danger:hover {
+                    background: #fecaca;
+                }
+
+            .teacher-avatar {
+                width: 42px;
+                height: 42px;
+                flex-shrink: 0;
+                border-radius: 50%;
+                background: #e7e7e7;
+                color: #212121;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: 700;
+            }
+
+            .teacher-list {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .teacher-item {
+                padding: 16px;
+                border: 1px solid #e5e5e5;
+                border-radius: 10px;
+                background: #f7f7f8;
+            }
+
+            .teacher-head {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .teacher-avatar {
+                width: 42px;
+                height: 42px;
+                flex-shrink: 0;
+                border-radius: 50%;
+                background: #dbeafe;
+                color: #1d4ed8;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: 700;
+            }
+
+            .teacher-info {
+                flex: 1;
+            }
+
+            .teacher-id {
+                color: #111827;
+                font-size: 17px;
+                font-weight: 700;
+            }
+
+            .teacher-role {
+                margin-top: 2px;
+                color: #6b7280;
+                font-size: 13px;
+            }
+
+            .teacher-actions {
+                display: flex;
+                gap: 8px;
+            }
+
+            .password-form {
+                display: none;
+                margin-top: 15px;
+                padding-top: 15px;
+                border-top: 1px solid #e5e5e5;
+            }
+
+                .password-form.open {
+                    display: block;
+                }
+
+            .password-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr auto;
+                gap: 8px;
+                align-items: end;
+            }
+
+                .password-grid .fg {
+                    margin-bottom: 0;
+                }
+
+            .empty {
+                padding: 50px 20px;
+                color: #676767;
+                text-align: center;
+                border: 1px dashed #d4d4d4;
+                border-radius: 10px;
+                background: #f7f7f8;
+            }
+
+            .empty-title {
+                margin-bottom: 5px;
+                color: #212121;
+                font-size: 17px;
+                font-weight: 700;
+            }
+
+            @@media (max-width: 900px) {
+                .layout {
+                    grid-template-columns: 1fr;
+                }
+
+                .password-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            @@media (max-width: 600px) {
+                .topbar {
+                    height: auto;
+                    padding: 15px;
+                    flex-wrap: wrap;
+                }
+
+                .page {
+                    padding: 22px 14px 40px;
+                }
+
+                .teacher-head {
+                    align-items: flex-start;
+                    flex-wrap: wrap;
+                }
+
+                .teacher-actions {
+                    width: 100%;
+                }
+            }
+    </style>
+</head>
+
+<body>
+
+    <header class="topbar">
+        <div class="topbar-title">
+            病理教學系統
+        </div>
+
+        <div class="topbar-space"></div>
+
+        <div class="admin-info">
+            管理員：@loginId
+        </div>
+
+        <a class="back-link"
+           href="@Url.Action("SurgicalTableManagement", "Home")">
+            返回首頁
+        </a>
+    </header>
+
+    <main class="page">
+
+        <div class="page-header">
+            <h1 class="page-title">老師帳號管理</h1>
+
+            <p class="page-sub">
+                建立、修改密碼及刪除老師帳號
+            </p>
+        </div>
+
+        @if (TempData["Message"] != null)
+        {
+            string messageType =
+                TempData["MessageType"]?.ToString()
+                ?? "error";
+
+            <div class="alert @(messageType == "success"
+                                                                  ? "alert-success"
+                                                                  : "alert-error")">
+                @TempData["Message"]
+            </div>
+        }
+
+        <div class="layout">
+
+            <!-- 建立老師帳號 -->
+            <section class="card">
+
+                <h2 class="card-title">
+                    註冊老師帳號
+                </h2>
+
+                <p class="card-sub">
+                    由管理員建立新的老師登入帳號
+                </p>
+
+                <form method="post"
+                      action="@Url.Action(
+                                                                      "CreateTeacherAccount",
+                                                                      "Home")">
+
+                    @Html.AntiForgeryToken()
+
+                    <div class="fg">
+                        <label>教職員編號</label>
+
+                        <input type="text"
+                               name="loginId"
+                               minlength="4"
+                               placeholder="例：T2026006"
+                               autocomplete="off"
+                               required />
+                    </div>
+
+                    <div class="fg">
+                        <label>密碼</label>
+
+                        <input type="password"
+                               name="password"
+                               minlength="8"
+                               placeholder="至少 8 個字元"
+                               autocomplete="new-password"
+                               required />
+                    </div>
+
+                    <div class="fg">
+                        <label>確認密碼</label>
+
+                        <input type="password"
+                               name="confirmPassword"
+                               minlength="8"
+                               placeholder="再次輸入密碼"
+                               autocomplete="new-password"
+                               required />
+                    </div>
+
+                    <div class="fg">
+                        <label>隨機驗證碼</label>
+
+                        <div class="captcha-row">
+
+                            <div class="captcha-code">
+                                @ViewBag.Captcha
+                            </div>
+
+                            <input type="text"
+                                   name="captcha"
+                                   placeholder="輸入驗證碼"
+                                   autocomplete="off"
+                                   required />
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary"
+                            type="submit">
+                        建立老師帳號
+                    </button>
+
+                </form>
+            </section>
+
+            <!-- 老師帳號清單 -->
+            <section class="card">
+
+                <h2 class="card-title">
+                    老師帳號清單
+
+                    <span class="teacher-count">
+                        @(Model?.Count ?? 0) 筆
+                    </span>
+                </h2>
+
+                <p class="card-sub">
+                    可修改老師密碼或刪除帳號
+                </p>
+
+                @if (Model == null || Model.Count == 0)
+                {
+                    <div class="empty">
+                        <div class="empty-title">
+                            尚無老師帳號
+                        </div>
+
+                        <div>
+                            請使用左側表單建立老師帳號
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="teacher-list">
+
+                        @foreach (var teacher in Model)
+                        {
+                            string formId =
+                                $"password-{teacher.LoginId}";
+
+                            <div class="teacher-item">
+
+                                <div class="teacher-head">
+
+                                    <div class="teacher-avatar">
+                                        師
+                                    </div>
+
+                                    <div class="teacher-info">
+                                        <div class="teacher-id">
+                                            @teacher.LoginId
+                                        </div>
+
+                                        <div class="teacher-role">
+                                            身分：老師
+                                        </div>
+                                    </div>
+
+                                    <div class="teacher-actions">
+
+                                        <button type="button"
+                                                class="btn btn-warning"
+                                                onclick="togglePasswordForm(
+                                            '@formId')">
+                                            修改密碼
+                                        </button>
+
+                                        <form method="post"
+                                              action="@Url.Action(
+                                                                                                                                              "DeleteTeacherAccount",
+                                                                                                                                              "Home")"
+                                              onsubmit="return confirm(
+                                            '確定要刪除老師帳號「@teacher.LoginId」嗎？');">
+
+                                            @Html.AntiForgeryToken()
+
+                                            <input type="hidden"
+                                                   name="loginId"
+                                                   value="@teacher.LoginId" />
+
+                                            <button type="submit"
+                                                    class="btn btn-danger">
+                                                刪除
+                                            </button>
+                                        </form>
+
+                                    </div>
+                                </div>
+
+                                <div id="@formId"
+                                     class="password-form">
+
+                                    <form method="post"
+                                          action="@Url.Action(
+                                                                                                                                  "ResetTeacherPassword",
+                                                                                                                                  "Home")">
+
+                                        @Html.AntiForgeryToken()
+
+                                        <input type="hidden"
+                                               name="loginId"
+                                               value="@teacher.LoginId" />
+
+                                        <div class="password-grid">
+
+                                            <div class="fg">
+                                                <label>新密碼</label>
+
+                                                <input type="password"
+                                                       name="newPassword"
+                                                       minlength="8"
+                                                       placeholder="至少 8 個字元"
+                                                       required />
+                                            </div>
+
+                                            <div class="fg">
+                                                <label>確認新密碼</label>
+
+                                                <input type="password"
+                                                       name="confirmNewPassword"
+                                                       minlength="8"
+                                                       placeholder="再次輸入新密碼"
+                                                       required />
+                                            </div>
+
+                                            <button type="submit"
+                                                    class="btn btn-warning">
+                                                儲存新密碼
+                                            </button>
+
+                                        </div>
+                                    </form>
+                                </div>
+
+                            </div>
+                        }
+
+                    </div>
+                }
+
+            </section>
+        </div>
+    </main>
+
+    <script>
+            function togglePasswordForm(id) {
+                const form = document.getElementById(id);
+
+                if (!form) {
+                    return;
+                }
+
+                form.classList.toggle("open");
+            }
+    </script>
+
+</body>
+</html>

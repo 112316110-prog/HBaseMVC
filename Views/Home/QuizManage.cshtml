@@ -1,0 +1,1146 @@
+﻿@using Microsoft.AspNetCore.Http
+@model List<HBaseMVC.Controllers.QuizQuestion>
+
+@{
+    Layout = null;
+
+    ViewBag.Title =
+        "出題測驗 — 病理教學系統";
+
+    string role =
+        Context.Session.GetString("Role")
+        ?? "";
+
+    string loginId =
+        Context.Session.GetString("LoginId")
+        ?? "";
+
+    string roleLabel =
+        role == "Admin"
+            ? "管理員"
+            : "老師";
+
+    var quizArchives =
+        ViewBag.QuizArchives
+            as List<HBaseMVC.Controllers.QuizVersionArchive>
+        ?? new List<HBaseMVC.Controllers.QuizVersionArchive>();
+    var questionVersions =
+        ViewBag.QuestionVersions
+            as List<HBaseMVC.Controllers.QuizQuestionVersion>
+        ?? new List<HBaseMVC.Controllers.QuizQuestionVersion>();
+    string currentQuizVersion =
+        ViewBag.CurrentQuizVersion?.ToString()
+        ?? "";
+}
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+
+    <title>@ViewBag.Title</title>
+
+    <style>
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                background: #f4f6f9;
+                color: #2c3e50;
+                font-family: "Microsoft JhengHei", sans-serif;
+            }
+
+            .topbar {
+                height: 68px;
+                display: flex;
+                align-items: center;
+                gap: 18px;
+                padding: 0 32px;
+                background: #fff;
+                border-bottom: 1px solid #dcdfe6;
+            }
+
+            .brand {
+                font-size: 28px;
+                font-weight: 700;
+            }
+
+            .spacer {
+                flex: 1;
+            }
+
+            .back {
+                color: #5f6b7a;
+                text-decoration: none;
+            }
+
+            .container {
+                max-width: 1100px;
+                margin: 0 auto;
+                padding: 34px 24px 70px;
+            }
+
+            .page-title {
+                font-size: 28px;
+                font-weight: 700;
+                margin-bottom: 6px;
+            }
+
+            .page-subtitle {
+                color: #7a8492;
+                margin-bottom: 24px;
+            }
+
+            .message {
+                padding: 13px 16px;
+                margin-bottom: 20px;
+                border-radius: 8px;
+                border: 1px solid #dcdfe6;
+                background: #fff;
+            }
+
+                .message.success {
+                    background: #f0fdf4;
+                    border-color: #22c55e;
+                    color: #166534;
+                }
+
+                .message.error {
+                    background: #fef2f2;
+                    border-color: #ef4444;
+                    color: #991b1b;
+                }
+
+            .card {
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-radius: 12px;
+                padding: 22px;
+                margin-bottom: 24px;
+            }
+
+            .card-title {
+                font-size: 18px;
+                font-weight: 700;
+                margin-bottom: 18px;
+            }
+
+            .field {
+                margin-bottom: 14px;
+            }
+
+                .field label {
+                    display: block;
+                    margin-bottom: 6px;
+                    color: #5f6b7a;
+                    font-size: 13px;
+                    font-weight: 600;
+                }
+
+                .field input[type="text"],
+                .field textarea,
+                .field select {
+                    width: 100%;
+                    min-height: 40px;
+                    padding: 9px 11px;
+                    border: 1px solid #cfd6e0;
+                    border-radius: 8px;
+                    background: #fff;
+                    color: #2c3e50;
+                    font-family: inherit;
+                    font-size: 14px;
+                }
+
+                .field textarea {
+                    min-height: 85px;
+                    resize: vertical;
+                }
+
+            .option-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+
+            .row {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                min-height: 38px;
+                padding: 0 16px;
+                border: 1px solid #cfd6e0;
+                border-radius: 8px;
+                background: #fff;
+                color: #2c3e50;
+                cursor: pointer;
+                font-family: inherit;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .btn-primary {
+                background: #2563eb;
+                border-color: #2563eb;
+                color: #fff;
+            }
+
+            .btn-danger {
+                color: #b91c1c;
+                border-color: #fecaca;
+                background: #fff;
+            }
+
+            .btn-success {
+                color: #166534;
+                border-color: #bbf7d0;
+                background: #f0fdf4;
+            }
+
+            .question-item {
+                border: 1px solid #e5e7eb;
+                border-radius: 10px;
+                padding: 16px;
+                margin-bottom: 14px;
+            }
+
+            .question-head {
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                margin-bottom: 10px;
+            }
+
+            .question-text {
+                flex: 1;
+                font-size: 16px;
+                font-weight: 700;
+                line-height: 1.6;
+            }
+
+            .status {
+                padding: 3px 9px;
+                border-radius: 999px;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+
+                .status.active {
+                    background: #dcfce7;
+                    color: #166534;
+                }
+
+                .status.inactive {
+                    background: #f1f5f9;
+                    color: #64748b;
+                }
+
+            .option-list {
+                margin: 8px 0 12px;
+                color: #475569;
+                line-height: 1.9;
+            }
+
+            .answer {
+                color: #166534;
+                font-weight: 700;
+            }
+
+            .meta {
+                color: #94a3b8;
+                font-size: 12px;
+                margin-top: 8px;
+            }
+
+            .item-actions {
+                display: flex;
+                gap: 8px;
+                margin-top: 12px;
+                flex-wrap: wrap;
+            }
+
+            .empty {
+                text-align: center;
+                color: #94a3b8;
+                padding: 34px 0;
+            }
+
+            .archive-toolbar {
+                margin-bottom: 16px;
+            }
+
+            .archive-search {
+                width: 100%;
+                min-height: 40px;
+                padding: 8px 12px;
+                border: 1px solid #cfd6e0;
+                border-radius: 8px;
+                font-family: inherit;
+                font-size: 14px;
+            }
+
+            .archive-version {
+                margin-bottom: 10px;
+            }
+
+            .archive-version-btn {
+                width: 100%;
+                min-height: 48px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 10px 14px;
+                border: 1px solid #dcdfe6;
+                border-radius: 9px;
+                background: #fff;
+                color: #2c3e50;
+                font-family: inherit;
+                font-size: 14px;
+                font-weight: 700;
+                cursor: pointer;
+                text-align: left;
+            }
+
+                .archive-version-btn:hover {
+                    background: #f8fafc;
+                }
+
+                .archive-version-btn.active {
+                    border-color: #2563eb;
+                    color: #2563eb;
+                }
+
+            .archive-panel {
+                display: none;
+                margin-top: 8px;
+                padding: 16px;
+                border: 1px solid #e5e7eb;
+                border-radius: 9px;
+                background: #fafafa;
+            }
+
+                .archive-panel.show {
+                    display: block;
+                }
+
+            .archive-question {
+                padding: 14px 0;
+                border-bottom: 1px solid #e5e7eb;
+            }
+
+                .archive-question:last-child {
+                    border-bottom: 0;
+                }
+
+            .archive-question-title {
+                font-weight: 700;
+                line-height: 1.6;
+                margin-bottom: 8px;
+            }
+
+            .archive-options {
+                color: #475569;
+                line-height: 1.8;
+            }
+
+            .archive-answer {
+                margin-top: 6px;
+                color: #166534;
+                font-weight: 700;
+            }
+
+            .archive-meta {
+                color: #94a3b8;
+                font-size: 12px;
+                font-weight: 400;
+            }
+
+            @@media (max-width: 760px) {
+                .option-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+    </style>
+</head>
+
+<body>
+
+    <header class="topbar">
+
+        <div class="brand">
+            病理教學系統
+        </div>
+
+        <span>
+            出題測驗
+        </span>
+
+        <div class="spacer"></div>
+
+        <span style="color:#7a8492;">
+            @roleLabel：@loginId
+        </span>
+
+        <a class="back"
+           href="@(role == "Admin"
+                          ? Url.Action("SurgicalTableManagement", "Home")
+                          : Url.Action("Index", "Home"))">
+            ← 返回首頁
+        </a>
+
+    </header>
+
+
+    <main class="container">
+
+        <div class="page-title">
+            出題管理
+        </div>
+
+        <div class="page-subtitle">
+            題目敘述應完整且具備明確意義，每題只有一個正確答案。
+        </div>
+
+
+        @if (TempData["Message"] != null)
+        {
+            string messageType =
+                TempData["MessageType"]?.ToString()
+                ?? "error";
+
+            <div class="message @messageType">
+                @TempData["Message"]
+            </div>
+        }
+
+
+        <section class="card">
+
+            <div class="card-title">
+                新增題目
+            </div>
+
+            <form method="post"
+                  action="@Url.Action("CreateQuizQuestion", "Home")">
+
+                @Html.AntiForgeryToken()
+
+                <div class="field">
+                    <label for="questionText">
+                        題目
+                    </label>
+
+                    <textarea id="questionText"
+                              name="questionText"
+                              required></textarea>
+                </div>
+
+
+                <div class="option-grid">
+
+                    <div class="field">
+                        <label for="optionA">
+                            A 選項
+                        </label>
+
+                        <input id="optionA"
+                               type="text"
+                               name="optionA"
+                               required />
+                    </div>
+
+                    <div class="field">
+                        <label for="optionB">
+                            B 選項
+                        </label>
+
+                        <input id="optionB"
+                               type="text"
+                               name="optionB"
+                               required />
+                    </div>
+
+                    <div class="field">
+                        <label for="optionC">
+                            C 選項
+                        </label>
+
+                        <input id="optionC"
+                               type="text"
+                               name="optionC"
+                               required />
+                    </div>
+
+                    <div class="field">
+                        <label for="optionD">
+                            D 選項
+                        </label>
+
+                        <input id="optionD"
+                               type="text"
+                               name="optionD"
+                               required />
+                    </div>
+
+                </div>
+
+
+                <div class="field">
+                    <label for="correctAnswer">
+                        正確答案
+                    </label>
+
+                    <select id="correctAnswer"
+                            name="correctAnswer"
+                            required>
+
+                        <option value="">
+                            請選擇
+                        </option>
+
+                        <option value="A">
+                            A
+                        </option>
+
+                        <option value="B">
+                            B
+                        </option>
+
+                        <option value="C">
+                            C
+                        </option>
+
+                        <option value="D">
+                            D
+                        </option>
+
+                    </select>
+                </div>
+
+
+                <div class="field">
+                    <label for="explanation">
+                        答案解析（可選）
+                    </label>
+
+                    <textarea id="explanation"
+                              name="explanation"></textarea>
+                </div>
+
+
+                <div class="row">
+
+                    <label style="
+                        display:flex;
+                        align-items:center;
+                        gap:7px;">
+
+                        <input type="checkbox"
+                               name="isActive"
+                               value="true"
+                               checked />
+
+                        建立後立即發布給學生
+                    </label>
+
+                    <div class="spacer"></div>
+
+                    <button type="submit"
+                            class="btn btn-primary">
+                        新增題目
+                    </button>
+
+                </div>
+
+            </form>
+        </section>
+        <section class="card">
+
+            <div class="card-title">
+                題庫版本（@questionVersions.Count 版）
+            </div>
+
+            @if (questionVersions.Count == 0)
+            {
+                <div class="empty">
+                    目前尚未建立任何測驗版本。
+                </div>
+            }
+            else
+            {
+                @for (
+                    int versionIndex = 0;
+                    versionIndex < questionVersions.Count;
+                    versionIndex++)
+                {
+                    var version =
+                        questionVersions[versionIndex];
+
+                    string panelId =
+                        $"question-version-panel-{versionIndex}";
+
+                    <div class="archive-version">
+
+                        <button type="button"
+                                class="archive-version-btn"
+                                onclick="toggleQuestionVersion(
+                            '@panelId',
+                            this
+                            )">
+
+                            <span>
+
+                                @version.VersionName
+
+                                @if (version.IsCurrent)
+                                {
+                                    <span class="status active"
+                                          style="margin-left:8px;">
+                                        目前發布
+                                    </span>
+                                }
+
+                                @if (version.IsTest)
+                                {
+                                    <span style="
+                                        margin-left:8px;
+                                        color:#94a3b8;
+                                        font-size:12px;">
+                                        測試資料
+                                    </span>
+                                }
+
+                            </span>
+
+                            <span class="archive-meta">
+                                @version.Questions.Count 題
+                            </span>
+
+                        </button>
+
+
+                        <div id="@panelId"
+                             class="archive-panel">
+
+                            @for (
+                                int i = 0;
+                                i < version.Questions.Count;
+                                i++)
+                            {
+                                var q =
+                                    version.Questions[i];
+
+                                <div class="archive-question">
+
+                                    <div class="archive-question-title">
+
+                                        @(i + 1).
+                                        @q.QuestionText
+
+                                    </div>
+
+                                    <div class="archive-options">
+
+                                        <div>
+                                            A. @q.OptionA
+                                        </div>
+
+                                        <div>
+                                            B. @q.OptionB
+                                        </div>
+
+                                        <div>
+                                            C. @q.OptionC
+                                        </div>
+
+                                        <div>
+                                            D. @q.OptionD
+                                        </div>
+
+                                    </div>
+
+                                    <div class="archive-answer">
+
+                                        正確答案：
+                                        @q.CorrectAnswer
+
+                                    </div>
+
+                                    @if (
+                                        !string.IsNullOrWhiteSpace(
+                                            q.Explanation))
+                                    {
+                                        <div style="
+                                            margin-top:5px;
+                                            color:#64748b;">
+
+                                            解析：
+                                            @q.Explanation
+
+                                        </div>
+                                    }
+
+                                </div>
+                            }
+
+                        </div>
+
+                    </div>
+                }
+            }
+
+        </section>
+        <section class="card">
+
+            <div class="card-title">
+                歷史測驗查詢
+            </div>
+
+            <div class="archive-toolbar">
+
+                <input id="quizHistorySearch"
+                       class="archive-search"
+                       type="text"
+                       placeholder="輸入版本名稱或題目關鍵字，例如：A83F、腎臟、肺臟"
+                       oninput="filterQuizHistory()" />
+
+            </div>
+
+
+            @if (quizArchives.Count == 0)
+            {
+                <div class="empty">
+                    目前尚無歷史測驗作答紀錄。
+                </div>
+            }
+            else
+            {
+                <div id="historySearchHint"
+                     class="empty">
+
+                    請輸入版本名稱或題目關鍵字進行查詢。
+
+                </div>
+
+
+                <div id="historyNoResult"
+                     class="empty"
+                     style="display:none;">
+
+                    找不到符合條件的歷史測驗。
+
+                </div>
+
+
+                <div id="quizHistoryList">
+
+                    @for (
+                        int archiveIndex = 0;
+                        archiveIndex < quizArchives.Count;
+                        archiveIndex++)
+                    {
+                        var archive =
+                            quizArchives[archiveIndex];
+
+                        string fullVersion =
+                            archive.QuizVersion
+                            ?? "";
+
+                        string shortVersion =
+                            fullVersion.Length > 12
+                                ? fullVersion.Substring(0, 12)
+                                : fullVersion;
+
+                        string panelId =
+                            $"history-panel-{archiveIndex}";
+
+                        string searchText =
+                            (
+                                fullVersion
+                                + " "
+                                + string.Join(
+                                    " ",
+                                    archive.Questions.Select(q =>
+                                        (q.QuestionText ?? "")
+                                        + " "
+                                        + (q.OptionA ?? "")
+                                        + " "
+                                        + (q.OptionB ?? "")
+                                        + " "
+                                        + (q.OptionC ?? "")
+                                        + " "
+                                        + (q.OptionD ?? "")
+                                        + " "
+                                        + (q.Explanation ?? "")
+                                    )
+                                )
+                            )
+                            .ToLowerInvariant();
+
+                        <div class="archive-version history-result"
+                             data-search="@searchText"
+                             style="display:none;">
+
+                            <button type="button"
+                                    class="archive-version-btn"
+                                    onclick="toggleHistoryPanel(
+                                '@panelId',
+                                this
+                                )">
+
+                                <span>
+                                    測驗版本 @shortVersion
+                                </span>
+
+                                <span class="archive-meta">
+
+                                    @archive.Questions.Count 題
+                                    ／
+                                    @archive.AttemptCount 次作答
+
+                                </span>
+
+                            </button>
+
+
+                            <div id="@panelId"
+                                 class="archive-panel">
+
+                                <div class="archive-meta"
+                                     style="margin-bottom:12px;">
+
+                                    完整版本：
+                                    @archive.QuizVersion
+
+                                    <br />
+
+                                    首次作答：
+                                    @(
+                                        string.IsNullOrWhiteSpace(
+                                            archive.FirstSubmittedAt)
+                                            ? "—"
+                                            : archive.FirstSubmittedAt
+                                    )
+
+                                    <br />
+
+                                    最近作答：
+                                    @(
+                                        string.IsNullOrWhiteSpace(
+                                            archive.LastSubmittedAt)
+                                            ? "—"
+                                            : archive.LastSubmittedAt
+                                    )
+
+                                </div>
+
+
+                                @for (
+                                    int i = 0;
+                                    i < archive.Questions.Count;
+                                    i++)
+                                {
+                                    var q =
+                                        archive.Questions[i];
+
+                                    <div class="archive-question">
+
+                                        <div class="archive-question-title">
+
+                                            @(i + 1).
+                                            @q.QuestionText
+
+                                        </div>
+
+                                        <div class="archive-options">
+
+                                            <div>A. @q.OptionA</div>
+                                            <div>B. @q.OptionB</div>
+                                            <div>C. @q.OptionC</div>
+                                            <div>D. @q.OptionD</div>
+
+                                        </div>
+
+                                        <div class="archive-answer">
+
+                                            正確答案：
+                                            @q.CorrectAnswer
+
+                                        </div>
+
+                                        @if (
+                                            !string.IsNullOrWhiteSpace(
+                                                q.Explanation))
+                                        {
+                                            <div style="
+                                                margin-top:5px;
+                                                color:#64748b;">
+
+                                                解析：
+                                                @q.Explanation
+
+                                            </div>
+                                        }
+
+                                    </div>
+                                }
+
+                            </div>
+
+                        </div>
+                    }
+
+                </div>
+            }
+        </section>
+    </main>
+    <script>
+
+            // =========================================================
+            // 題庫版本展開 / 收起
+            // =========================================================
+
+            function toggleQuestionVersion(
+                panelId,
+                button
+            ) {
+
+                const panel =
+                    document.getElementById(
+                        panelId
+                    );
+
+                const shouldOpen =
+                    !panel.classList.contains(
+                        "show"
+                    );
+
+
+                document
+                    .querySelectorAll(
+                        "[id^='question-version-panel-']"
+                    )
+                    .forEach(x =>
+                        x.classList.remove("show")
+                    );
+
+
+                document
+                    .querySelectorAll(
+                        ".archive-version-btn"
+                    )
+                    .forEach(x =>
+                        x.classList.remove("active")
+                    );
+
+
+                if (shouldOpen) {
+
+                    panel.classList.add(
+                        "show"
+                    );
+
+                    button.classList.add(
+                        "active"
+                    );
+                }
+            }
+
+
+            // =========================================================
+            // 歷史版本展開 / 收起
+            // =========================================================
+
+            function toggleHistoryPanel(
+                panelId,
+                button
+            ) {
+
+                const panel =
+                    document.getElementById(
+                        panelId
+                    );
+
+                const shouldOpen =
+                    !panel.classList.contains(
+                        "show"
+                    );
+
+
+                document
+                    .querySelectorAll(
+                        "[id^='history-panel-']"
+                    )
+                    .forEach(x =>
+                        x.classList.remove("show")
+                    );
+
+
+                document
+                    .querySelectorAll(
+                        ".history-result .archive-version-btn"
+                    )
+                    .forEach(x =>
+                        x.classList.remove("active")
+                    );
+
+
+                if (shouldOpen) {
+
+                    panel.classList.add(
+                        "show"
+                    );
+
+                    button.classList.add(
+                        "active"
+                    );
+                }
+            }
+
+
+            // =========================================================
+            // 歷史版本搜尋
+            // 版本名稱 + 題目 + 選項 + 解析
+            // =========================================================
+
+            function filterQuizHistory() {
+
+                const input =
+                    document.getElementById(
+                        "quizHistorySearch"
+                    );
+
+                const keyword =
+                    (input?.value || "")
+                        .trim()
+                        .toLowerCase();
+
+
+                const items =
+                    document.querySelectorAll(
+                        ".history-result"
+                    );
+
+                const hint =
+                    document.getElementById(
+                        "historySearchHint"
+                    );
+
+                const noResult =
+                    document.getElementById(
+                        "historyNoResult"
+                    );
+
+
+                // 沒輸入關鍵字
+                // 歷史紀錄全部隱藏
+                if (keyword === "") {
+
+                    items.forEach(item => {
+
+                        item.style.display =
+                            "none";
+
+                        const panel =
+                            item.querySelector(
+                                ".archive-panel"
+                            );
+
+                        if (panel) {
+                            panel.classList.remove(
+                                "show"
+                            );
+                        }
+
+                    });
+
+
+                    if (hint) {
+                        hint.style.display =
+                            "";
+                    }
+
+                    if (noResult) {
+                        noResult.style.display =
+                            "none";
+                    }
+
+                    return;
+                }
+
+
+                if (hint) {
+                    hint.style.display =
+                        "none";
+                }
+
+
+                let matchedCount = 0;
+
+
+                items.forEach(item => {
+
+                    const searchText =
+                        (
+                            item.dataset.search
+                            || ""
+                        )
+                        .toLowerCase();
+
+
+                    const matched =
+                        searchText.includes(
+                            keyword
+                        );
+
+
+                    item.style.display =
+                        matched
+                            ? ""
+                            : "none";
+
+
+                    if (matched) {
+                        matchedCount++;
+                    }
+                    else {
+
+                        const panel =
+                            item.querySelector(
+                                ".archive-panel"
+                            );
+
+                        if (panel) {
+                            panel.classList.remove(
+                                "show"
+                            );
+                        }
+
+                    }
+
+                });
+
+
+                if (noResult) {
+
+                    noResult.style.display =
+                        matchedCount === 0
+                            ? ""
+                            : "none";
+
+                }
+            }
+
+    </script>
+
+</body>
+</html>

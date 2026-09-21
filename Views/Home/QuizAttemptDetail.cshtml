@@ -1,0 +1,214 @@
+﻿@using Microsoft.AspNetCore.Http
+@model HBaseMVC.Controllers.QuizAttemptRecord
+
+@{
+    Layout = null;
+    ViewBag.Title = "測驗作答明細 — 病理教學系統";
+    string role = Context.Session.GetString("Role") ?? "";
+    bool isStudent = role == "Student";
+
+    string OptionText(HBaseMVC.Controllers.QuizQuestionSnapshot q, string answer)
+    {
+        return answer switch
+        {
+            "A" => q.OptionA,
+            "B" => q.OptionB,
+            "C" => q.OptionC,
+            "D" => q.OptionD,
+            _ => "未作答"
+        };
+    }
+}
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewBag.Title</title>
+    <style>
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                background: #f4f6f9;
+                color: #2c3e50;
+                font-family: "Microsoft JhengHei",sans-serif;
+            }
+
+            .topbar {
+                height: 68px;
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                padding: 0 32px;
+                background: #fff;
+                border-bottom: 1px solid #dcdfe6;
+            }
+
+            .brand {
+                font-size: 28px;
+                font-weight: 700;
+            }
+
+            .spacer {
+                flex: 1;
+            }
+
+            .btn {
+                min-height: 38px;
+                padding: 0 16px;
+                border: 1px solid #cfd6e0;
+                border-radius: 8px;
+                background: #fff;
+                color: #2c3e50;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+            }
+
+            .container {
+                max-width: 950px;
+                margin: 0 auto;
+                padding: 34px 24px 70px;
+            }
+
+            .summary {
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-left: 5px solid #2563eb;
+                border-radius: 10px;
+                padding: 18px 20px;
+                margin-bottom: 22px;
+            }
+
+            .score {
+                font-size: 26px;
+                font-weight: 700;
+                color: #2563eb;
+            }
+
+            .meta {
+                color: #7a8492;
+                margin-top: 5px;
+            }
+
+            .q {
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 16px;
+            }
+
+            .q-title {
+                font-size: 17px;
+                font-weight: 700;
+                line-height: 1.6;
+                margin-bottom: 12px;
+            }
+
+            .answer-row {
+                padding: 10px 12px;
+                border-radius: 8px;
+                margin-top: 7px;
+            }
+
+            .correct {
+                background: #f0fdf4;
+                border: 1px solid #86efac;
+                color: #166534;
+            }
+
+            .wrong {
+                background: #fef2f2;
+                border: 1px solid #fecaca;
+                color: #991b1b;
+            }
+
+            .explain {
+                margin-top: 12px;
+                color: #5f6b7a;
+                line-height: 1.7;
+            }
+
+            .empty {
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-radius: 12px;
+                padding: 40px;
+                text-align: center;
+                color: #7a8492;
+            }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">病理教學系統</div>
+        <span>作答情況</span>
+        <div class="spacer"></div>
+        @if (isStudent)
+        {
+            <a class="btn" href="@Url.Action("QuizHistory", "Home")">返回歷史紀錄</a>
+        }
+        else
+        {
+            <a class="btn" href="@Url.Action("QuizProgress", "Home")">返回學生作答狀況</a>
+        }
+    </header>
+
+    <main class="container">
+        <div class="summary">
+            <div class="score">@Model.Score / @Model.Total</div>
+            <div class="meta">學生：@Model.StudentId</div>
+            <div class="meta">作答時間：@Model.SubmittedAt</div>
+        </div>
+
+        @if (Model.Questions == null || Model.Questions.Count == 0)
+        {
+            <div class="empty">
+                此筆為舊版作答紀錄，且原題目目前已無法從題庫還原，因此無法顯示完整正確答案。
+            </div>
+        }
+        else
+        {
+            int index = 0;
+            foreach (var q in Model.Questions)
+            {
+                index++;
+                string studentAnswer =
+                    Model.Answers.ContainsKey(q.Id)
+                        ? Model.Answers[q.Id]
+                        : "";
+
+                bool isCorrect =
+                    string.Equals(
+                        studentAnswer,
+                        q.CorrectAnswer,
+                        StringComparison.OrdinalIgnoreCase
+                    );
+
+                <section class="q">
+                    <div class="q-title">@index. @q.QuestionText</div>
+
+                    <div class="answer-row @(isCorrect ? "correct" : "wrong")">
+                        學生答案：
+                        @(string.IsNullOrWhiteSpace(studentAnswer) ? "未作答" : $"{studentAnswer}. {OptionText(q, studentAnswer)}")
+                    </div>
+
+                    <div class="answer-row correct">
+                        正確答案：@q.CorrectAnswer. @OptionText(q, q.CorrectAnswer)
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(q.Explanation))
+                    {
+                        <div class="explain">解析：@q.Explanation</div>
+                    }
+                </section>
+            }
+        }
+    </main>
+</body>
+</html>

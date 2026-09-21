@@ -1,0 +1,1188 @@
+﻿@model List<HBaseMVC.Models.MedicalRecordSearchItem>
+@using Microsoft.AspNetCore.Http
+
+@{
+    Layout = null;
+
+    string role =
+        Context.Session.GetString("Role")
+        ?? "";
+
+    bool isTeacher =
+        role == "Teacher"
+        || role == "Admin";
+
+    bool isAdmin =
+        role == "Admin";
+
+    string roleDisplay = role switch
+    {
+        "Admin" => "管理員",
+        "Teacher" => "老師",
+        "Student" => "學生",
+        _ => "未知身分"
+    };
+
+    string startDate =
+        ViewBag.StartDate as string ?? "";
+
+    string endDate =
+        ViewBag.EndDate as string ?? "";
+
+    string disease =
+        ViewBag.Disease as string ?? "";
+
+    string row =
+        ViewBag.Row as string ?? "";
+
+    string medicalRecordNumber =
+        ViewBag.MedicalRecordNumber as string ?? "";
+}
+
+<!DOCTYPE html>
+
+<html lang="zh-TW">
+
+<head>
+
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width,
+    initial-scale=1.0" />
+
+    <title>病歷管理</title>
+
+    <style>
+
+            :root {
+                --bg: #ffffff;
+                --bg2: #ffffff;
+                --bg3: #f7f7f8;
+                --border: #e5e5e5;
+                --border2: #d4d4d4;
+                --text: #212121;
+                --text2: #676767;
+                --text3: #969696;
+                --accent: #212121;
+                --accent-hover: #000000;
+                --radius: 9px;
+                --radius-lg: 16px;
+                --sidebar-width: 260px;
+                --sidebar-bg: #f7f7f8;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                background: var(--bg);
+                color: var(--text);
+                font-family: "Microsoft JhengHei", Arial, sans-serif;
+                font-size: 14px;
+            }
+
+            .shell {
+                min-height: 100vh;
+            }
+
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: calc( var(--sidebar-width) * -1 );
+                z-index: 200;
+                width: var(--sidebar-width);
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                padding: 12px;
+                background: var(--sidebar-bg);
+                border-right: 1px solid var(--border);
+                overflow-y: auto;
+                transition: left 0.22s ease, box-shadow 0.22s ease;
+            }
+
+                .sidebar.open {
+                    left: 0;
+                    box-shadow: 8px 0 30px rgba(0, 0, 0, 0.15);
+                }
+
+            .sidebar-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 190;
+                display: none;
+                background: rgba(0, 0, 0, 0.28);
+            }
+
+                .sidebar-overlay.open {
+                    display: block;
+                }
+
+            body.sidebar-open {
+                overflow: hidden;
+            }
+
+            .sidebar-brand {
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                padding: 8px 8px 18px;
+            }
+
+            .brand-icon {
+                width: 36px;
+                height: 36px;
+                display: grid;
+                place-items: center;
+                border-radius: 10px;
+                background: var(--accent);
+                color: #ffffff;
+                font-size: 18px;
+                font-weight: 600;
+            }
+
+            .brand-title {
+                font-size: 14px;
+                font-weight: 600;
+            }
+
+            .brand-subtitle {
+                color: var(--text3);
+                font-size: 11px;
+            }
+
+            .sidebar-section {
+                padding: 18px 10px 7px;
+                color: var(--text3);
+                font-size: 11px;
+                font-weight: 500;
+            }
+
+            .nav-item {
+                min-height: 42px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 9px 11px;
+                margin-bottom: 2px;
+                border-radius: 9px;
+                color: var(--text);
+                font-size: 14px;
+                text-decoration: none;
+            }
+
+                .nav-item:visited,
+                .nav-item:hover,
+                .nav-item:active,
+                .nav-item:focus {
+                    color: var(--text);
+                    text-decoration: none;
+                }
+
+                .nav-item:hover {
+                    background: #ececec;
+                }
+
+                .nav-item.active {
+                    background: #e7e7e7;
+                }
+
+            .nav-icon {
+                width: 18px;
+                height: 18px;
+                flex-shrink: 0;
+                opacity: 0.75;
+            }
+
+            .sidebar-spacer {
+                flex: 1;
+            }
+
+            .account-card {
+                display: flex;
+                align-items: center;
+                gap: 9px;
+                padding: 12px 8px 4px;
+                border-top: 1px solid var(--border);
+            }
+
+            .account-avatar {
+                width: 34px;
+                height: 34px;
+                display: grid;
+                place-items: center;
+                border-radius: 50%;
+                background: #dedede;
+                font-size: 13px;
+                font-weight: 600;
+            }
+
+            .account-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .account-name {
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            .account-id {
+                overflow: hidden;
+                color: var(--text3);
+                font-size: 11px;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .account-logout {
+                color: var(--text2);
+                font-size: 12px;
+                text-decoration: none;
+            }
+
+            .main {
+                min-height: 100vh;
+            }
+
+            .app-header {
+                position: sticky;
+                top: 0;
+                z-index: 50;
+                height: 58px;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 0 24px;
+                background: rgba(255,255,255,0.95);
+                border-bottom: 1px solid var(--border);
+                backdrop-filter: blur(8px);
+            }
+
+            .mobile-menu-button {
+                width: 36px;
+                height: 36px;
+                display: grid;
+                place-items: center;
+                border: 0;
+                border-radius: 9px;
+                background: transparent;
+                color: var(--text);
+                font-size: 20px;
+                cursor: pointer;
+            }
+
+                .mobile-menu-button:hover {
+                    background: var(--bg3);
+                }
+
+            .app-header-title {
+                font-size: 16px;
+                font-weight: 600;
+            }
+
+            .app-header-spacer {
+                flex: 1;
+            }
+
+            .home-button {
+                min-height: 36px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0 14px;
+                border: 1px solid var(--border2);
+                border-radius: var(--radius);
+                background: var(--bg2);
+                color: var(--text);
+                font-size: 13px;
+                font-weight: 500;
+                text-decoration: none;
+            }
+
+                .home-button:hover {
+                    background: var(--bg3);
+                }
+
+            .page {
+                max-width: 1500px;
+                margin: 0 auto;
+                padding: 30px 28px 50px;
+            }
+
+            .page-heading {
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .title {
+                font-size: 28px;
+                font-weight: 700;
+            }
+
+            .subtitle {
+                margin-top: 5px;
+                color: var(--text3);
+                font-size: 13px;
+            }
+
+            .card {
+                margin-bottom: 20px;
+                padding: 20px;
+                background: var(--bg2);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-lg);
+                box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            }
+
+            .card-title {
+                margin-bottom: 15px;
+                font-size: 18px;
+                font-weight: 600;
+            }
+
+            .filter-grid {
+                display: grid;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 12px;
+                align-items: end;
+            }
+
+            label {
+                display: block;
+                margin-bottom: 6px;
+                color: var(--text2);
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            input {
+                width: 100%;
+                height: 40px;
+                padding: 8px 10px;
+                border: 1px solid var(--border2);
+                border-radius: 7px;
+                background: var(--bg2);
+                color: var(--text);
+                font-family: inherit;
+                font-size: 14px;
+                outline: none;
+            }
+
+                input:focus {
+                    border-color: #969696;
+                    box-shadow: 0 0 0 2px rgba(0,0,0,0.04);
+                }
+
+            .button-row {
+                margin-top: 14px;
+                display: flex;
+                gap: 8px;
+                justify-content: flex-end;
+            }
+
+            .btn {
+                min-height: 38px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0 16px;
+                border: 1px solid var(--accent);
+                border-radius: var(--radius);
+                background: var(--accent);
+                color: #ffffff;
+                font-family: inherit;
+                font-size: 13px;
+                font-weight: 500;
+                text-decoration: none;
+                cursor: pointer;
+            }
+
+                .btn:hover {
+                    background: var(--accent-hover);
+                    border-color: var(--accent-hover);
+                }
+
+            .btn-secondary {
+                background: #ffffff;
+                color: var(--text);
+                border-color: var(--border2);
+            }
+
+                .btn-secondary:hover {
+                    background: var(--bg3);
+                }
+
+            .result-count {
+                margin-bottom: 12px;
+                color: var(--text2);
+                font-size: 13px;
+            }
+
+            .table-wrap {
+                overflow-x: auto;
+                border: 1px solid var(--border);
+                border-radius: 10px;
+            }
+
+            table {
+                width: 100%;
+                min-width: 1450px;
+                border-collapse: collapse;
+                background: #ffffff;
+            }
+
+            th,
+            td {
+                padding: 11px 12px;
+                border-bottom: 1px solid var(--border);
+                vertical-align: top;
+                text-align: left;
+                font-size: 13px;
+            }
+
+            th {
+                position: sticky;
+                top: 0;
+                background: #f7f7f8;
+                color: var(--text2);
+                font-weight: 600;
+                white-space: nowrap;
+            }
+
+            tbody tr:hover {
+                background: #fafafa;
+            }
+
+            tbody tr:last-child td {
+                border-bottom: 0;
+            }
+
+            .nowrap {
+                white-space: nowrap;
+            }
+
+            .text-cell {
+                min-width: 180px;
+                max-width: 300px;
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+
+            .empty {
+                padding: 40px;
+                color: var(--text3);
+                text-align: center;
+            }
+
+            .badge {
+                display: inline-flex;
+                align-items: center;
+                min-height: 25px;
+                padding: 2px 8px;
+                border-radius: 999px;
+                background: #eeeeee;
+                color: var(--text2);
+                font-size: 12px;
+                white-space: nowrap;
+            }
+
+            @@media (max-width: 1000px) {
+
+                .filter-grid {
+                    grid-template-columns: repeat(2, minmax(0,1fr));
+                }
+            }
+
+            @@media (max-width: 650px) {
+
+                .page {
+                    padding: 18px 14px 40px;
+                }
+
+                .app-header {
+                    padding: 0 14px;
+                }
+
+                .filter-grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .button-row {
+                    justify-content: stretch;
+                }
+
+                    .button-row .btn {
+                        flex: 1;
+                    }
+            }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="shell">
+
+        <nav class="sidebar"
+             id="app-sidebar">
+
+            <div class="sidebar-brand">
+
+                <div class="brand-icon">
+                    P
+                </div>
+
+                <div>
+
+                    <div class="brand-title">
+                        病理教學系統
+                    </div>
+
+                    <div class="brand-subtitle">
+                        Pathology AI
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            @if (!isAdmin)
+            {
+                <a class="nav-item"
+                   href="@Url.Action("Index", "Home", new { panel = "ai" })">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    新增對話
+                </a>
+            }
+
+            <div class="sidebar-section">
+                資料管理
+            </div>
+
+            <a class="nav-item"
+               href="@Url.Action("Index", "Home", new { panel = "list" })">
+                <svg class="nav-icon"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.5"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm0 5.25h.007v.008H3.75v-.008z" />
+                </svg>
+                資料列表
+            </a>
+
+            <a class="nav-item"
+               href="@Url.Action("Index", "Home", new { panel = "search" })">
+                <svg class="nav-icon"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.5"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803z" />
+                </svg>
+                搜尋影像
+            </a>
+
+            <a class="nav-item active"
+               href="@Url.Action("MedicalRecordManagement", "Home")">
+                <svg class="nav-icon"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.5"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M9 12h6m-6 4h6m2.25 4.5h-10.5A2.25 2.25 0 014.5 18.25V5.75A2.25 2.25 0 016.75 3.5h7.5l5.25 5.25v9.5a2.25 2.25 0 01-2.25 2.25z" />
+                </svg>
+                病歷管理
+            </a>
+
+            <a class="nav-item"
+               href="@Url.Action("SurgicalTableManagement", "Home")">
+                <svg class="nav-icon"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.5"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M4.5 7.5h15m-15 9h15M7.5 4.5v15m9-15v15" />
+                </svg>
+                手術台資料
+            </a>
+
+            @if (isAdmin)
+            {
+                <a class="nav-item"
+                   href="@Url.Action("Index", "Home", new { panel = "add" })">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    新增大體老師資料
+                </a>
+
+                <a class="nav-item"
+                   href="@Url.Action("TeacherAccounts", "Home")">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8M19 8v6M22 11h-6" />
+                    </svg>
+                    老師帳號管理
+                </a>
+
+                <a class="nav-item"
+                   href="@Url.Action("StudentAccounts", "Home")">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772" />
+                    </svg>
+                    學生帳號管理
+                </a>
+
+                <a class="nav-item"
+                   href="@Url.Action("BackupManagement", "Home")">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M4.5 6.75A2.25 2.25 0 016.75 4.5h10.5a2.25 2.25 0 012.25 2.25v10.5a2.25 2.25 0 01-2.25 2.25H6.75a2.25 2.25 0 01-2.25-2.25V6.75zM8 4.5v5h8v-5M8 19.5v-6h8v6" />
+                    </svg>
+                    備份管理
+                </a>
+            }
+
+            <div class="sidebar-section">
+                教學功能
+            </div>
+
+            @if (role == "Student")
+            {
+                <a class="nav-item"
+                   href="@Url.Action("Quiz", "Home")">
+                    測驗
+                </a>
+
+                <a class="nav-item"
+                   href="@Url.Action("QuizHistory", "Home")">
+                    測驗歷史紀錄
+                </a>
+
+                <a class="nav-item"
+                   href="@Url.Action("DailyNotes", "Home")">
+                    課程筆記
+                </a>
+            }
+
+            @if (isTeacher)
+            {
+                <a class="nav-item"
+                   href="@Url.Action("QuizManage", "Home")">
+                    出題測驗
+                </a>
+
+                <a class="nav-item"
+                   href="@Url.Action("QuizProgress", "Home")">
+                    學生作答狀況
+                </a>
+            }
+
+            @if (!isAdmin)
+            {
+                <a class="nav-item"
+                   href="@Url.Action("Index", "Home", new { panel = "ai" })">
+                    <svg class="nav-icon"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M8.625 3.75a3.375 3.375 0 016.75 0v.75h.75a3.375 3.375 0 013.375 3.375v8.25a3.375 3.375 0 01-3.375 3.375h-8.25A3.375 3.375 0 014.5 16.125v-8.25A3.375 3.375 0 017.875 4.5h.75v-.75z" />
+                    </svg>
+                    AI 助教
+                </a>
+            }
+
+            <div class="sidebar-spacer">
+            </div>
+
+
+            <div class="account-card">
+
+                <div class="account-avatar">
+                    @(isAdmin
+                        ? "管"
+                        : role == "Teacher"
+                            ? "師"
+                            : "生")
+                </div>
+
+                <div class="account-info">
+
+                    <div class="account-name">
+                        @roleDisplay
+                    </div>
+
+                    <div class="account-id">
+                        @Context.Session.GetString(
+                            "LoginId"
+                        )
+                    </div>
+
+                </div>
+
+                <a class="account-logout"
+                   href="@Url.Action(
+                                                         "Logout",
+                                                         "Home"
+                                                     )">
+                    登出
+                </a>
+
+            </div>
+
+        </nav>
+
+
+        <div class="sidebar-overlay"
+             id="sidebar-overlay"
+             onclick="closeSidebar()">
+        </div>
+
+
+        <main class="main">
+
+            <header class="app-header">
+
+                <button type="button"
+                        class="mobile-menu-button"
+                        onclick="toggleSidebar()"
+                        aria-label="開啟選單">
+                    ☰
+                </button>
+
+                <div class="app-header-title">
+                    病歷管理
+                </div>
+
+                <div class="app-header-spacer">
+                </div>
+
+                <a class="home-button"
+                   href="@(isAdmin
+                                                         ? Url.Action(
+                                                             "SurgicalTableManagement",
+                                                             "Home"
+                                                           )
+                                                 : Url.Action(
+                                                     "Index",
+                                                     "Home"
+                                                   ))">
+                    ← 回首頁
+                </a>
+
+            </header>
+
+
+            <div class="page">
+
+                <div class="page-heading">
+
+                    <div class="title">
+                        病歷管理
+                    </div>
+
+                    <div class="subtitle">
+                        依病人編號、病歷號碼、日期與病症關鍵字查詢病歷紀錄
+                    </div>
+
+                </div>
+
+
+                <div class="card">
+
+                    <div class="card-title">
+                        病歷查詢
+                    </div>
+
+                    <form method="get"
+                          action="@Url.Action(
+                                                                            "MedicalRecordManagement",
+                                                                            "Home"
+                                                                        )">
+
+                        <div class="filter-grid">
+
+                            <div>
+
+                                <label>
+                                    病人編號
+                                </label>
+
+                                <input type="text"
+                                       name="row"
+                                       value="@row"
+                                       placeholder="例如 DEMO001" />
+
+                            </div>
+
+
+                            <div>
+
+                                <label>
+                                    病歷號碼
+                                </label>
+
+                                <input type="text"
+                                       name="medicalRecordNumber"
+                                       value="@medicalRecordNumber"
+                                       placeholder="例如 MR-DEMO-0001" />
+
+                            </div>
+
+
+                            <div>
+
+                                <label>
+                                    開始日期
+                                </label>
+
+                                <input type="date"
+                                       name="startDate"
+                                       value="@startDate" />
+
+                            </div>
+
+
+                            <div>
+
+                                <label>
+                                    結束日期
+                                </label>
+
+                                <input type="date"
+                                       name="endDate"
+                                       value="@endDate" />
+
+                            </div>
+
+
+                            <div>
+
+                                <label>
+                                    病症關鍵字
+                                </label>
+
+                                <input type="text"
+                                       name="disease"
+                                       value="@disease"
+                                       placeholder="例如 攝護腺癌" />
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="button-row">
+
+                            <a class="btn btn-secondary"
+                               href="@Url.Action(
+                                                                                             "MedicalRecordManagement",
+                                                                                             "Home"
+                                                                                         )">
+                                清除條件
+                            </a>
+
+                            <button type="submit"
+                                    class="btn">
+                                查詢
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+
+                <div class="card">
+
+                    <div class="card-title">
+                        病歷紀錄
+                    </div>
+
+
+                    <div class="result-count">
+                        共 @Model.Count 筆
+                    </div>
+
+
+                    @if (Model == null ||
+                         Model.Count == 0)
+                    {
+                        <div class="empty">
+                            目前沒有符合條件的病歷紀錄。
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-wrap">
+
+                            <table>
+
+                                <thead>
+
+                                    <tr>
+
+                                        <th>
+                                            病人編號
+                                        </th>
+
+                                        <th>
+                                            病歷號碼
+                                        </th>
+
+                                        <th>
+                                            性別
+                                        </th>
+
+                                        <th>
+                                            解剖狀態
+                                        </th>
+
+                                        <th>
+                                            日期
+                                        </th>
+
+                                        <th>
+                                            診斷
+                                        </th>
+
+                                        <th>
+                                            部位
+                                        </th>
+
+                                        <th>
+                                            發現
+                                        </th>
+
+                                        <th>
+                                            治療
+                                        </th>
+
+                                        <th>
+                                            醫師
+                                        </th>
+
+                                        <th>
+                                            備註
+                                        </th>
+
+                                        <th>
+                                            資源類型
+                                        </th>
+
+                                    </tr>
+
+                                </thead>
+
+
+                                <tbody>
+
+                                    @foreach (var item in Model)
+                                    {
+                                        <tr>
+
+                                            <td class="nowrap">
+                                                @item.RowKey
+                                            </td>
+
+                                            <td class="nowrap">
+                                                @item.MedicalRecordNumber
+                                            </td>
+
+                                            <td class="nowrap">
+                                                @item.Gender
+                                            </td>
+
+                                            <td class="nowrap">
+
+                                                <span class="badge">
+                                                    @(item.IsDissected
+                                                        ? "已解剖"
+                                                        : "未解剖")
+                                                </span>
+
+                                            </td>
+
+                                            <td class="nowrap">
+                                                @item.OccurredAt
+                                            </td>
+
+                                            <td class="text-cell">
+                                                @item.Diagnosis
+                                            </td>
+
+                                            <td class="text-cell">
+                                                @item.BodyPart
+                                            </td>
+
+                                            <td class="text-cell">
+                                                @item.Finding
+                                            </td>
+
+                                            <td class="text-cell">
+                                                @item.Treatment
+                                            </td>
+
+                                            <td class="nowrap">
+                                                @item.Physician
+                                            </td>
+
+                                            <td class="text-cell">
+                                                @item.Note
+                                            </td>
+
+                                            <td class="nowrap">
+                                                @item.ResourceType
+                                            </td>
+
+                                        </tr>
+                                    }
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+                    }
+
+                </div>
+
+            </div>
+
+        </main>
+
+    </div>
+
+
+    <script>
+
+            function toggleSidebar() {
+
+                const sidebar =
+                    document.getElementById(
+                        'app-sidebar'
+                    );
+
+                const overlay =
+                    document.getElementById(
+                        'sidebar-overlay'
+                    );
+
+                if (!sidebar ||
+                    !overlay) {
+                    return;
+                }
+
+                const willOpen =
+                    !sidebar.classList.contains(
+                        'open'
+                    );
+
+                sidebar.classList.toggle(
+                    'open',
+                    willOpen
+                );
+
+                overlay.classList.toggle(
+                    'open',
+                    willOpen
+                );
+
+                document.body.classList.toggle(
+                    'sidebar-open',
+                    willOpen
+                );
+            }
+
+
+            function closeSidebar() {
+
+                document
+                    .getElementById(
+                        'app-sidebar'
+                    )
+                    ?.classList.remove(
+                        'open'
+                    );
+
+                document
+                    .getElementById(
+                        'sidebar-overlay'
+                    )
+                    ?.classList.remove(
+                        'open'
+                    );
+
+                document.body.classList.remove(
+                    'sidebar-open'
+                );
+            }
+
+
+            document.addEventListener(
+                'keydown',
+                function(event) {
+
+                    if (event.key ===
+                        'Escape') {
+
+                        closeSidebar();
+                    }
+                }
+            );
+
+    </script>
+
+</body>
+
+</html>

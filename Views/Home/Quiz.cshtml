@@ -1,0 +1,488 @@
+﻿@using Microsoft.AspNetCore.Http
+@model List<HBaseMVC.Controllers.QuizQuestion>
+
+@{
+    Layout = null;
+
+    ViewBag.Title =
+        "測驗 — 病理教學系統";
+
+    bool submitted =
+        ViewBag.Submitted is bool s
+        && s;
+
+    bool alreadyCompleted =
+        ViewBag.AlreadyCompleted is bool ac
+        && ac;
+
+    int completedScore =
+        ViewBag.CompletedScore is int cs ? cs : 0;
+
+    int completedTotal =
+        ViewBag.CompletedTotal is int ct ? ct : 0;
+
+    string completedAt =
+        ViewBag.CompletedAt?.ToString() ?? "";
+
+    string completedAttemptId =
+        ViewBag.CompletedAttemptId?.ToString() ?? "";
+
+    int score =
+        ViewBag.Score is int sc
+            ? sc
+            : 0;
+
+    int total =
+        ViewBag.Total is int t
+            ? t
+            : Model.Count;
+
+    var answers =
+        ViewBag.Answers
+            as Dictionary<string, string>
+        ?? new Dictionary<string, string>();
+
+    string studentId =
+        Context.Session.GetString("LoginId")
+        ?? "";
+}
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+
+    <title>@ViewBag.Title</title>
+
+    <style>
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                background: #f4f6f9;
+                color: #2c3e50;
+                font-family: "Microsoft JhengHei", sans-serif;
+            }
+
+            .topbar {
+                height: 68px;
+                display: flex;
+                align-items: center;
+                gap: 18px;
+                padding: 0 32px;
+                background: #fff;
+                border-bottom: 1px solid #dcdfe6;
+            }
+
+            .brand {
+                font-size: 28px;
+                font-weight: 700;
+            }
+
+            .topbar-spacer {
+                flex: 1;
+            }
+
+            .back {
+                color: #5f6b7a;
+                text-decoration: none;
+                font-size: 14px;
+            }
+
+            .container {
+                max-width: 900px;
+                margin: 0 auto;
+                padding: 34px 24px 60px;
+            }
+
+            .page-title {
+                font-size: 28px;
+                font-weight: 700;
+                margin-bottom: 6px;
+            }
+
+            .page-subtitle {
+                color: #7a8492;
+                margin-bottom: 26px;
+            }
+
+            .score-box {
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-left: 5px solid #2563eb;
+                border-radius: 10px;
+                padding: 18px 20px;
+                margin-bottom: 22px;
+            }
+
+            .score-value {
+                font-size: 26px;
+                font-weight: 700;
+                color: #2563eb;
+            }
+
+            .warning {
+                margin-top: 10px;
+                color: #991b1b;
+                font-size: 13px;
+            }
+
+            .question-card {
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-radius: 12px;
+                padding: 22px;
+                margin-bottom: 18px;
+            }
+
+            .question-number {
+                color: #2563eb;
+                font-size: 13px;
+                font-weight: 700;
+                margin-bottom: 8px;
+            }
+
+            .question-text {
+                font-size: 18px;
+                font-weight: 600;
+                line-height: 1.7;
+                margin-bottom: 16px;
+            }
+
+            .option {
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                width: 100%;
+                padding: 11px 12px;
+                margin: 8px 0;
+                border: 1px solid #dcdfe6;
+                border-radius: 8px;
+                background: #fff;
+            }
+
+                .option input {
+                    margin-top: 3px;
+                }
+
+                .option.correct {
+                    border-color: #22c55e;
+                    background: #f0fdf4;
+                }
+
+                .option.wrong {
+                    border-color: #ef4444;
+                    background: #fef2f2;
+                }
+
+            .answer-info {
+                margin-top: 14px;
+                padding-top: 12px;
+                border-top: 1px solid #eef1f5;
+                font-size: 14px;
+                line-height: 1.8;
+            }
+
+            .correct-text {
+                color: #166534;
+                font-weight: 600;
+            }
+
+            .wrong-text {
+                color: #991b1b;
+                font-weight: 600;
+            }
+
+            .explanation {
+                margin-top: 6px;
+                color: #5f6b7a;
+            }
+
+            .actions {
+                display: flex;
+                justify-content: flex-end;
+                gap: 10px;
+                margin-top: 24px;
+            }
+
+            .btn {
+                min-height: 40px;
+                padding: 0 20px;
+                border: 1px solid #cfd6e0;
+                border-radius: 8px;
+                background: #fff;
+                color: #2c3e50;
+                font-family: inherit;
+                font-size: 14px;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .btn-primary {
+                background: #2563eb;
+                border-color: #2563eb;
+                color: #fff;
+            }
+
+            .empty {
+                padding: 80px 20px;
+                text-align: center;
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-radius: 12px;
+                color: #7a8492;
+            }
+    </style>
+</head>
+
+<body>
+
+    <header class="topbar">
+        <div class="brand">
+            病理教學系統
+        </div>
+
+        <span>
+            學生測驗
+        </span>
+
+        <div class="topbar-spacer"></div>
+
+        <span style="color:#7a8492;">
+            學號：@studentId
+        </span>
+
+        <a class="back"
+           href="@Url.Action("Index", "Home")">
+            ← 返回首頁
+        </a>
+    </header>
+
+
+    <main class="container">
+
+        <div class="page-title">
+            選擇題測驗
+        </div>
+
+        <div class="page-subtitle">
+            請選擇每題唯一正確答案，完成後按「提交測驗」。
+        </div>
+
+
+        @if (submitted)
+        {
+            <div class="score-box">
+                <div>
+                    本次成績
+                </div>
+
+                <div class="score-value">
+                    @score / @total
+                </div>
+
+                @if (ViewBag.SaveWarning != null)
+                {
+                    <div class="warning">
+                        @ViewBag.SaveWarning
+                    </div>
+                }
+            </div>
+        }
+
+
+        @if (Model == null || Model.Count == 0)
+        {
+            <div class="empty">
+                目前尚未發布任何測驗題目。
+            </div>
+        }
+        else
+        {
+            @if (alreadyCompleted)
+            {
+                <section class="score-box" style="margin-bottom:22px;">
+                    <div style="font-size:18px;font-weight:700;margin-bottom:8px;">
+                        已作答完畢
+                    </div>
+
+                    <div class="score">
+                        @completedScore / @completedTotal
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(completedAt))
+                    {
+                        <div style="margin-top:8px;color:#7a8492;">
+                            完成時間：@completedAt
+                        </div>
+                    }
+
+                    <div class="actions" style="margin-top:16px;">
+                        <a class="btn btn-primary"
+                           href="@Url.Action("QuizHistory", "Home")">
+                            查看歷史紀錄
+                        </a>
+
+                        @if (!string.IsNullOrWhiteSpace(completedAttemptId))
+                        {
+                            <a class="btn"
+                               href="@Url.Action("QuizAttemptDetail", "Home", new { attemptId = completedAttemptId })">
+                                查看本次作答
+                            </a>
+                        }
+                    </div>
+                </section>
+            }
+            else
+            {
+                <form method="post"
+                      action="@Url.Action("SubmitQuiz", "Home")">
+
+                    @Html.AntiForgeryToken()
+
+                    @for (int i = 0;
+                          i < Model.Count;
+                          i++)
+                    {
+                        var q =
+                            Model[i];
+
+                        string selected =
+                            answers.ContainsKey(q.Id)
+                                ? answers[q.Id]
+                                : "";
+
+                        <section class="question-card">
+
+                            <div class="question-number">
+                                第 @(i + 1) 題
+                            </div>
+
+                            <div class="question-text">
+                                @q.QuestionText
+                            </div>
+
+
+                            @{
+                                var options =
+                                    new Dictionary<string, string>
+                                    {
+                                        ["A"] = q.OptionA,
+                                        ["B"] = q.OptionB,
+                                        ["C"] = q.OptionC,
+                                        ["D"] = q.OptionD
+                                    };
+                            }
+
+                            @foreach (var option in options)
+                            {
+                                string optionClass =
+                                    "option";
+
+                                if (submitted)
+                                {
+                                    if (option.Key ==
+                                        q.CorrectAnswer)
+                                    {
+                                        optionClass +=
+                                            " correct";
+                                    }
+                                    else if (
+                                        option.Key ==
+                                        selected)
+                                    {
+                                        optionClass +=
+                                            " wrong";
+                                    }
+                                }
+
+                                <label class="@optionClass">
+
+                                    <input type="radio"
+                                           name="answer_@q.Id"
+                                           value="@option.Key"
+                                           checked="@(selected == option.Key ? "checked" : null)"
+                                           disabled="@(submitted ? "disabled" : null)"
+                                           required />
+
+                                    <span>
+                                        <strong>
+                                            @option.Key.
+                                        </strong>
+                                        @option.Value
+                                    </span>
+
+                                </label>
+                            }
+
+
+                            @if (submitted)
+                            {
+                                bool isCorrect =
+                                    selected ==
+                                    q.CorrectAnswer;
+
+                                <div class="answer-info">
+
+                                    @if (isCorrect)
+                                    {
+                                        <div class="correct-text">
+                                            作答正確
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="wrong-text">
+                                            作答錯誤；正確答案為 @q.CorrectAnswer
+                                        </div>
+                                    }
+
+                                    @if (!string.IsNullOrWhiteSpace(
+                                            q.Explanation))
+                                    {
+                                        <div class="explanation">
+                                            解析：@q.Explanation
+                                        </div>
+                                    }
+
+                                </div>
+                            }
+
+                        </section>
+                    }
+
+
+                    <div class="actions">
+
+                        @if (!submitted)
+                        {
+                            <button type="submit"
+                                    class="btn btn-primary">
+                                提交測驗
+                            </button>
+                        }
+                        else
+                        {
+                            <a class="btn btn-primary"
+                               href="@Url.Action("Quiz", "Home")">
+                                再測驗一次
+                            </a>
+                        }
+
+                    </div>
+
+                </form>
+            }
+        }
+
+    </main>
+
+</body>
+</html>

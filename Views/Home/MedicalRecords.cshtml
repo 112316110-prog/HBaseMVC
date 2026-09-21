@@ -1,0 +1,1272 @@
+﻿@model List<HBaseMVC.Models.MedicalRecordPatientSearchResult>
+@using Microsoft.AspNetCore.Http
+
+@{
+    ViewBag.Title = "病歷調閱";
+
+    var currentPatient =
+        ViewBag.CurrentPatient
+        as HBaseMVC.Models.Cadaver;
+
+    bool searchPerformed =
+        ViewBag.SearchPerformed is bool value
+        && value;
+
+    string currentRow =
+        ViewBag.Row as string
+        ?? "";
+
+    string patientNumber =
+        ViewBag.PatientNumber as string
+        ?? "";
+
+    string keyword =
+        ViewBag.Keyword as string
+        ?? "";
+
+    string medicalRecordNumber =
+        ViewBag.MedicalRecordNumber as string
+        ?? "";
+
+    string startDate =
+        ViewBag.StartDate as string
+        ?? "";
+
+    string endDate =
+        ViewBag.EndDate as string
+        ?? "";
+}
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+
+    <title>@ViewBag.Title</title>
+
+    <style>
+
+            body {
+                background: #ffffff;
+                color: #212121;
+                font-family: "Noto Sans TC", Arial, sans-serif;
+                padding: 28px;
+            }
+
+            .page {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            .top {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 18px;
+            }
+
+            .title {
+                font-size: 30px;
+                font-weight: 700;
+            }
+
+            .sub {
+                color: #6b7280;
+                margin-top: 4px;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: 380px 1fr;
+                gap: 18px;
+                align-items: start;
+            }
+
+            .card {
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                border-radius: 16px;
+                padding: 18px;
+                margin-bottom: 16px;
+            }
+
+            .card-title {
+                font-size: 20px;
+                font-weight: 600;
+                color: #212121;
+                margin-bottom: 12px;
+            }
+
+            .kv {
+                display: grid;
+                grid-template-columns: 110px 1fr;
+                gap: 8px 12px;
+                font-size: 16px;
+            }
+
+                .kv .k {
+                    color: #6b7280;
+                }
+
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 36px;
+                padding: 0 14px;
+                border: 1px solid #d4d4d4;
+                border-radius: 9px;
+                color: #212121;
+                text-decoration: none;
+                background: #ffffff;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+            }
+
+            .btn-primary {
+                background: #212121;
+                color: #ffffff;
+                border-color: #212121;
+            }
+
+                .btn-primary:hover {
+                    background: #000000;
+                    border-color: #000000;
+                }
+
+            .form-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+
+            .full {
+                grid-column: 1 / -1;
+            }
+
+            label {
+                display: block;
+                color: #6b7280;
+                font-size: 14px;
+                margin-bottom: 4px;
+            }
+
+            input,
+            textarea {
+                width: 100%;
+                box-sizing: border-box;
+                border: 1px solid #d4d4d4;
+                border-radius: 9px;
+                padding: 8px 10px;
+                font-size: 15px;
+                background: #f4f4f4;
+                color: #212121;
+            }
+
+                input:focus,
+                textarea:focus {
+                    outline: none;
+                    border-color: #969696;
+                }
+
+            textarea {
+                min-height: 82px;
+                resize: vertical;
+            }
+
+            .record {
+                border-left: 4px solid #969696;
+                padding: 12px 14px;
+                background: #f7f7f8;
+                border-radius: 10px;
+                margin-bottom: 12px;
+            }
+
+            .record-head {
+                display: flex;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 8px;
+            }
+
+            .record-title {
+                font-weight: 700;
+                font-size: 18px;
+            }
+
+            .record-time {
+                color: #64748b;
+                font-size: 14px;
+                white-space: nowrap;
+            }
+
+            .patient-result {
+                border: 1px solid #e5e5e5;
+                border-radius: 16px;
+                margin-bottom: 22px;
+                overflow: hidden;
+                background: #ffffff;
+            }
+
+            .patient-result-head {
+                background: #f7f7f8;
+                border-bottom: 1px solid #e5e5e5;
+                padding: 14px 18px;
+            }
+
+            .patient-result-title {
+                font-size: 20px;
+                font-weight: 700;
+                margin-bottom: 6px;
+            }
+
+            .patient-result-info {
+                color: #64748b;
+                font-size: 14px;
+            }
+
+            .result-category {
+                padding: 18px;
+                border-bottom: 1px solid #e5e7eb;
+            }
+
+                .result-category:last-child {
+                    border-bottom: none;
+                }
+
+            .result-category-title {
+                font-size: 18px;
+                font-weight: 600;
+                color: #212121;
+                margin-bottom: 12px;
+            }
+
+            .result-summary {
+                color: #64748b;
+                margin-bottom: 14px;
+            }
+
+            .search-actions {
+                display: flex;
+                gap: 8px;
+                margin-top: 14px;
+            }
+
+            pre {
+                background: #0f172a;
+                color: #e5e7eb;
+                border-radius: 8px;
+                padding: 12px;
+                overflow: auto;
+                font-size: 13px;
+                line-height: 1.6;
+            }
+
+            details summary {
+                cursor: pointer;
+                color: #676767;
+                margin-top: 8px;
+                font-weight: 500;
+            }
+
+                details summary:hover {
+                    color: #212121;
+                }
+            .empty {
+                padding: 24px;
+                text-align: center;
+                color: #676767;
+                background: #f7f7f8;
+                border-radius: 10px;
+            }
+
+            @@media (max-width: 980px) {
+
+                .grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .form-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+    </style>
+
+</head>
+
+
+<body>
+
+    <div class="page">
+
+
+        <div class="top">
+
+            <div>
+
+                <div class="title">
+                    病歷調閱
+                </div>
+
+                <div class="sub">
+                    FHIR-like Patient / Observation；病歷以追加方式保留過往紀錄
+                </div>
+
+            </div>
+
+
+            <a class="btn"
+               href="@Url.Action("Index", "Home")">
+
+                返回資料列表
+
+            </a>
+
+        </div>
+
+
+        @if (TempData["Message"] != null)
+        {
+            <div class="card"
+                 style="border-left:4px solid #969696;">
+
+                @TempData["Message"]
+
+            </div>
+        }
+
+
+        <div class="grid">
+
+
+            <!-- ============================= -->
+            <!-- 左側：目前病患基本資料 -->
+            <!-- ============================= -->
+
+            <div>
+
+                <div class="card">
+
+                    <div class="card-title">
+                        病患基本資料
+                    </div>
+
+
+                    @if (currentPatient == null)
+                    {
+                        <div class="empty">
+                            尚未指定病人。
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="kv">
+
+                            <div class="k">
+                                病人編號
+                            </div>
+
+                            <div>
+                                @currentPatient.RowKey
+                            </div>
+
+
+                            <div class="k">
+                                病歷號碼
+                            </div>
+
+                            <div>
+                                @currentPatient.MedicalRecordNumber
+                            </div>
+
+
+                            <div class="k">
+                                性別
+                            </div>
+
+                            <div>
+                                @currentPatient.Gender
+                            </div>
+
+
+                            <div class="k">
+                                年齡
+                            </div>
+
+                            <div>
+                                @currentPatient.Age
+                            </div>
+
+
+                            <div class="k">
+                                血型
+                            </div>
+
+                            <div>
+                                @currentPatient.BloodType
+                                @currentPatient.BloodTypeSource
+                            </div>
+
+
+                            <div class="k">
+                                藥物過敏史
+                            </div>
+
+                            <div>
+                                @currentPatient.DrugAllergyHistory
+                            </div>
+
+
+                            <div class="k">
+                                過去病史
+                            </div>
+
+                            <div>
+                                @currentPatient.PastMedicalHistory
+                            </div>
+
+
+                            <div class="k">
+                                病歷筆數
+                            </div>
+
+                            <div>
+                                @(currentPatient.MedicalRecords?.Count ?? 0)
+                            </div>
+
+
+                            <div class="k">
+                                更新時間
+                            </div>
+
+                            <div>
+                                @currentPatient.PatientLastUpdated
+                            </div>
+
+                        </div>
+                    }
+
+                </div>
+
+            </div>
+
+
+            <!-- ============================= -->
+            <!-- 右側 -->
+            <!-- ============================= -->
+
+            <div>
+
+
+                <!-- ============================= -->
+                <!-- 查詢條件 -->
+                <!-- ============================= -->
+
+                <div class="card">
+
+                    <div class="card-title">
+                        查詢條件
+                    </div>
+
+
+                    <form method="get"
+                          action="@Url.Action("MedicalRecords", "Home")">
+
+                        <!--
+                        row 只負責保留左側目前病人。
+                        不作為搜尋條件。
+                    -->
+                        <input type="hidden"
+                               name="row"
+                               value="@currentRow" />
+
+
+                        <div class="form-grid">
+
+
+                            <div>
+
+                                <label>
+                                    開始日期
+                                </label>
+
+                                <input type="date"
+                                       name="startDate"
+                                       value="@startDate" />
+
+                            </div>
+
+
+                            <div>
+
+                                <label>
+                                    結束日期
+                                </label>
+
+                                <input type="date"
+                                       name="endDate"
+                                       value="@endDate" />
+
+                            </div>
+
+
+                            <div>
+
+                                <label>
+                                    疾病／關鍵字
+                                </label>
+
+                                <input type="text"
+                                       name="keyword"
+                                       value="@keyword"
+                                       placeholder="例：肺癌、糖尿病、胸部、HbA1c" />
+
+                            </div>
+
+
+                            <div>
+
+                                <label>
+                                    病人編號
+                                </label>
+
+                                <input type="text"
+                                       name="patientNumber"
+                                       value="@patientNumber"
+                                       placeholder="例：001" />
+
+                            </div>
+
+
+                            <div class="full">
+
+                                <label>
+                                    病歷號碼
+                                </label>
+
+                                <input type="text"
+                                       name="medicalRecordNumber"
+                                       value="@medicalRecordNumber"
+                                       placeholder="輸入病歷號碼" />
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="search-actions">
+
+                            <button type="submit"
+                                    class="btn btn-primary">
+
+                                查詢
+
+                            </button>
+
+
+                            <a class="btn"
+                               href="@Url.Action(
+                                                              "MedicalRecords",
+                                                              "Home",
+                                                              new
+                                                              {
+                                                                  row = currentRow
+                                                              }
+                                                          )">
+
+                                清除條件
+
+                            </a>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+
+                <!-- ============================= -->
+                <!-- 尚未搜尋 -->
+                <!-- ============================= -->
+                @if (!searchPerformed)
+                {
+                    <div class="card">
+
+                        <div class="empty">
+
+                            請輸入條件後查詢。
+
+                            <div style="
+                                margin-top:6px;
+                                font-size:14px;
+                                ">
+                                可搜尋疾病／關鍵字、病人編號、病歷號碼與日期區間。
+                            </div>
+
+                        </div>
+
+                    </div>
+                }
+                else if (Model == null || !Model.Any())
+                {
+                    <div class="card">
+
+                        <div class="card-title">
+                            搜尋結果
+                        </div>
+
+                        <div class="empty">
+                            查無符合條件的紀錄。
+                        </div>
+
+                    </div>
+                }
+                else
+                {
+                <div class="card">
+
+                    <div class="card-title">
+                        搜尋結果
+                    </div>
+
+                    <div class="result-summary">
+
+                        共找到
+                        <strong>@Model.Count</strong>
+                        位符合條件的病人。
+
+                    </div>
+
+                </div>
+
+
+                @foreach (var result in Model)
+                {
+                    var patient =
+                        result.Patient;
+
+
+                    <div class="patient-result">
+
+
+                        <!-- ============================= -->
+                        <!-- 病人分類 -->
+                        <!-- ============================= -->
+
+                        <div class="patient-result-head">
+
+                            <div class="patient-result-title">
+
+                                病人 @patient.RowKey
+
+                            </div>
+
+
+                            <div class="patient-result-info">
+
+                                病歷號碼：
+                                @(string.IsNullOrWhiteSpace(
+                                    patient.MedicalRecordNumber
+                                )
+                                    ? "未填寫"
+                                    : patient.MedicalRecordNumber)
+
+                                &nbsp;｜&nbsp;
+
+                                性別：
+                                @(string.IsNullOrWhiteSpace(
+                                    patient.Gender
+                                )
+                                    ? "未填寫"
+                                    : patient.Gender)
+
+                                &nbsp;｜&nbsp;
+
+                                血型：
+                                @(string.IsNullOrWhiteSpace(
+                                    patient.BloodType
+                                )
+                                    ? "未填寫"
+                                    : patient.BloodType)
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- ============================= -->
+                        <!-- 分類 1：歷次檢驗紀錄 -->
+                        <!-- 只有命中時才顯示 -->
+                        <!-- ============================= -->
+                        @if (
+                                                    result.LabTestRecords != null
+                                                    &&
+                                                    result.LabTestRecords.Any()
+                                                )
+                        {
+                            <div class="result-category">
+
+                                <div class="result-category-title">
+
+                                    歷次檢驗紀錄
+                                    （@result.LabTestRecords.Count）
+
+                                </div>
+
+
+                                @foreach (
+                                    var lab
+                                    in result.LabTestRecords
+                                )
+                                {
+                                    <div class="record">
+
+
+                                        <div class="record-head">
+
+                                            <div class="record-title">
+
+                                                @(
+                                                    !string.IsNullOrWhiteSpace(
+                                                        lab.TestItemName
+                                                    )
+                                                        ? lab.TestItemName
+                                                        : !string.IsNullOrWhiteSpace(
+                                                            lab.TestItem
+                                                        )
+                                                            ? lab.TestItem
+                                                            : "未命名檢驗"
+                                                )
+
+                                            </div>
+
+
+                                            <div class="record-time">
+                                                @lab.TestDate
+                                            </div>
+
+                                        </div>
+
+
+                                        <div class="kv">
+
+
+                                            <div class="k">
+                                                檢驗項目代碼
+                                            </div>
+
+                                            <div>
+                                                @lab.TestItemCode
+                                            </div>
+
+
+                                            <div class="k">
+                                                檢驗項目
+                                            </div>
+
+                                            <div>
+                                                @lab.TestItem
+                                            </div>
+
+
+                                            <div class="k">
+                                                檢驗結果
+                                            </div>
+
+                                            <div>
+                                                @lab.TestResult
+                                            </div>
+
+
+                                            <div class="k">
+                                                結果類型
+                                            </div>
+
+                                            <div>
+                                                @lab.ResultType
+                                            </div>
+
+
+                                            <div class="k">
+                                                數值結果
+                                            </div>
+
+                                            <div>
+                                                @lab.NumericResult
+                                                @lab.Unit
+                                            </div>
+
+
+                                            <div class="k">
+                                                文字結果
+                                            </div>
+
+                                            <div>
+                                                @lab.TextResult
+                                            </div>
+
+
+                                            <div class="k">
+                                                參考範圍
+                                            </div>
+
+                                            <div>
+                                                @lab.ReferenceRange
+                                            </div>
+
+
+                                            <div class="k">
+                                                異常標記
+                                            </div>
+
+                                            <div>
+                                                @lab.AbnormalFlag
+                                            </div>
+
+
+                                            <div class="k">
+                                                檢驗方法
+                                            </div>
+
+                                            <div>
+                                                @lab.TestMethod
+                                            </div>
+
+
+                                            <div class="k">
+                                                檢體採集時間
+                                            </div>
+
+                                            <div>
+                                                @lab.SpecimenCollectedAt
+                                            </div>
+
+
+                                            <div class="k">
+                                                檢查類型
+                                            </div>
+
+                                            <div>
+                                                @lab.ExaminationType
+                                            </div>
+
+
+                                            <div class="k">
+                                                檢查部位
+                                            </div>
+
+                                            <div>
+                                                @lab.BodyPart
+                                            </div>
+
+
+                                            <div class="k">
+                                                結果判讀
+                                            </div>
+
+                                            <div>
+                                                @lab.Interpretation
+                                            </div>
+
+
+                                            <div class="k">
+                                                影像結果
+                                            </div>
+
+                                            <div>
+                                                @lab.ImageResultPath
+                                            </div>
+
+
+                                            <div class="k">
+                                                波形結果
+                                            </div>
+
+                                            <div>
+                                                @lab.WaveformResultPath
+                                            </div>
+
+
+                                            <div class="k">
+                                                音訊結果
+                                            </div>
+
+                                            <div>
+                                                @lab.AudioResultPath
+                                            </div>
+
+
+                                            <div class="k">
+                                                DICOM 影像路徑
+                                            </div>
+
+                                            <div>
+                                                @lab.DicomResultPath
+                                            </div>
+
+
+                                            <div class="k">
+                                                影片結果路徑
+                                            </div>
+
+                                            <div>
+                                                @lab.VideoResultPath
+                                            </div>
+
+
+                                            <div class="k">
+                                                報告檔案路徑
+                                            </div>
+
+                                            <div>
+                                                @lab.ReportFilePath
+                                            </div>
+
+
+                                        </div>
+
+                                    </div>
+                                }
+
+                            </div>
+                        }
+
+
+                        <!-- ============================= -->
+                        <!-- 分類 2：過往病歷紀錄 -->
+                        <!-- 只有命中時才顯示 -->
+                        <!-- ============================= -->
+                        @if (
+                                                    result.MedicalRecords != null
+                                                    &&
+                                                    result.MedicalRecords.Any()
+                                                )
+                        {
+                            <div class="result-category">
+
+                                <div class="result-category-title">
+
+                                    過往病歷紀錄
+                                    （@result.MedicalRecords.Count）
+
+                                </div>
+
+
+                                @foreach (
+                                    var record
+                                    in result.MedicalRecords
+                                )
+                                {
+                                    <div class="record">
+
+
+                                        <div class="record-head">
+
+                                            <div class="record-title">
+                                                @record.Diagnosis
+                                            </div>
+
+                                            <div class="record-time">
+                                                @record.OccurredAt
+                                            </div>
+
+                                        </div>
+
+
+                                        <div class="kv">
+
+
+                                            <div class="k">
+                                                FHIR Type
+                                            </div>
+
+                                            <div>
+                                                @record.ResourceType
+                                            </div>
+
+
+                                            <div class="k">
+                                                部位
+                                            </div>
+
+                                            <div>
+                                                @record.BodyPart
+                                            </div>
+
+
+                                            <div class="k">
+                                                觀察結果
+                                            </div>
+
+                                            <div>
+                                                @record.Finding
+                                            </div>
+
+
+                                            <div class="k">
+                                                處置
+                                            </div>
+
+                                            <div>
+                                                @record.Treatment
+                                            </div>
+
+
+                                            <div class="k">
+                                                醫師
+                                            </div>
+
+                                            <div>
+                                                @record.Physician
+                                            </div>
+
+
+                                            <div class="k">
+                                                備註
+                                            </div>
+
+                                            <div>
+                                                @record.Note
+                                            </div>
+
+
+                                        </div>
+
+
+                                        <details>
+
+                                            <summary>
+                                                查看 FHIR-like JSON
+                                            </summary>
+
+                                            <pre>@record.FhirJson</pre>
+
+                                        </details>
+
+
+                                    </div>
+                                }
+
+                            </div>
+                        }
+
+
+                        <!-- ============================= -->
+                        <!-- 分類 3：住院資料 -->
+                        <!-- 只有命中時才顯示 -->
+                        <!-- ============================= -->
+                        @if (result.AdmissionMatched)
+                        {
+                            <div class="result-category">
+
+                                <div class="result-category-title">
+                                    住院資料
+                                </div>
+
+
+                                <div class="record">
+
+
+                                    <div class="record-head">
+
+                                        <div class="record-title">
+                                            住院紀錄
+                                        </div>
+
+
+                                        <div class="record-time">
+
+                                            @patient.AdmissionStartDate
+
+                                            @if (
+                                                !string.IsNullOrWhiteSpace(
+                                                    patient.AdmissionEndDate
+                                                )
+                                            )
+                                            {
+                                                <span>
+                                                    ～ @patient.AdmissionEndDate
+                                                </span>
+                                            }
+
+                                        </div>
+
+                                    </div>
+
+
+                                    <div class="kv">
+
+
+                                        <div class="k">
+                                            住院開始日期
+                                        </div>
+
+                                        <div>
+                                            @patient.AdmissionStartDate
+                                        </div>
+
+
+                                        <div class="k">
+                                            住院結束日期
+                                        </div>
+
+                                        <div>
+                                            @patient.AdmissionEndDate
+                                        </div>
+
+
+                                        <div class="k">
+                                            病房類型
+                                        </div>
+
+                                        <div>
+                                            @patient.WardType
+                                        </div>
+
+
+                                        <div class="k">
+                                            住院原因
+                                        </div>
+
+                                        <div>
+                                            @patient.AdmissionReason
+                                        </div>
+
+
+                                        <div class="k">
+                                            住院原因代碼
+                                        </div>
+
+                                        <div>
+                                            @patient.AdmissionReasonCode
+                                        </div>
+
+
+                                        <div class="k">
+                                            入院診斷代碼
+                                        </div>
+
+                                        <div>
+                                            @patient.AdmissionDiagnosisCode
+                                        </div>
+
+
+                                        <div class="k">
+                                            出院診斷代碼
+                                        </div>
+
+                                        <div>
+                                            @patient.DischargeDiagnosisCode
+                                        </div>
+
+
+                                        <div class="k">
+                                            主要診斷代碼
+                                        </div>
+
+                                        <div>
+                                            @patient.PrimaryDiagnosisCode
+                                        </div>
+
+
+                                        <div class="k">
+                                            次要診斷代碼
+                                        </div>
+
+                                        <div>
+                                            @patient.SecondaryDiagnosisCode
+                                        </div>
+
+
+                                        <div class="k">
+                                            醫院代碼
+                                        </div>
+
+                                        <div>
+                                            @patient.HospitalCode
+                                        </div>
+
+
+                                        <div class="k">
+                                            科別代碼
+                                        </div>
+
+                                        <div>
+                                            @patient.DepartmentCode
+                                        </div>
+
+
+                                        <div class="k">
+                                            出院狀態
+                                        </div>
+
+                                        <div>
+                                            @patient.DischargeStatus
+                                        </div>
+
+
+                                        <div class="k">
+                                            住院天數
+                                        </div>
+
+                                        <div>
+                                            @patient.LengthOfStay
+                                        </div>
+
+
+                                        <div class="k">
+                                            ICU 天數
+                                        </div>
+
+                                        <div>
+                                            @patient.IcuDays
+                                        </div>
+
+
+                                        <div class="k">
+                                            住院醫令代碼
+                                        </div>
+
+                                        <div>
+                                            @patient.InpatientOrderCode
+                                        </div>
+
+
+                                        <div class="k">
+                                            處置代碼
+                                        </div>
+
+                                        <div>
+                                            @patient.ProcedureCode
+                                        </div>
+
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        }
+
+
+                    </div>
+                }
+                }
+
+
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>

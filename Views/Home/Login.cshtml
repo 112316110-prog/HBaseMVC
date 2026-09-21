@@ -1,0 +1,292 @@
+﻿@{
+    Layout = null;
+    ViewBag.Title = "登入 — 病理教學系統";
+}
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewBag.Title</title>
+
+    <style>
+            body {
+                margin: 0;
+                min-height: 100vh;
+                background: #ffffff;
+                font-family: "Microsoft JhengHei", sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #212121;
+            }
+
+            .login-box {
+                width: 420px;
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                border-radius: 16px;
+                padding: 32px;
+                box-shadow: none;
+            }
+
+            .title {
+                font-size: 30px;
+                font-weight: 700;
+                color: #212121;
+                text-align: center;
+                margin-bottom: 6px;
+            }
+
+            .sub {
+                text-align: center;
+                color: #676767;
+                margin-bottom: 26px;
+                font-size: 14px;
+            }
+
+            .role-row {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+                margin-bottom: 18px;
+            }
+
+            .role-card {
+                border: 1px solid #d4d4d4;
+                border-radius: 9px;
+                padding: 14px;
+                text-align: center;
+                cursor: pointer;
+                background: #ffffff;
+                color: #676767;
+                transition: 0.15s;
+                user-select: none;
+            }
+
+                .role-card:hover {
+                    border-color: #969696;
+                    background: #f7f7f8;
+                    color: #212121;
+                }
+
+                .role-card input {
+                    display: none;
+                }
+
+                .role-card:has(input:checked) {
+                    border-color: #212121;
+                    background: #f4f4f4;
+                    color: #212121;
+                    font-weight: 700;
+                }
+
+            .fg {
+                margin-bottom: 14px;
+            }
+
+                .fg label {
+                    display: block;
+                    margin-bottom: 6px;
+                    font-size: 14px;
+                    color: #676767;
+                }
+
+                .fg input {
+                    width: 100%;
+                    height: 38px;
+                    padding: 0 10px;
+                    border: 1px solid #d4d4d4;
+                    border-radius: 9px;
+                    background: #f4f4f4;
+                    color: #212121;
+                    font-size: 15px;
+                    box-sizing: border-box;
+                }
+
+                    .fg input:focus {
+                        outline: none;
+                        border-color: #969696;
+                    }
+
+            .captcha-box {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .captcha-code {
+                min-width: 110px;
+                height: 38px;
+                border-radius: 9px;
+                background: #f4f4f4;
+                border: 1px solid #d4d4d4;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                font-weight: 700;
+                letter-spacing: 3px;
+                color: #212121;
+            }
+
+            .btn {
+                width: 100%;
+                height: 42px;
+                border: none;
+                border-radius: 9px;
+                background: #212121;
+                color: #ffffff;
+                font-size: 16px;
+                cursor: pointer;
+                margin-top: 8px;
+            }
+
+                .btn:hover {
+                    background: #000000;
+                }
+
+            .link-row {
+                text-align: center;
+                margin-top: 18px;
+                font-size: 14px;
+            }
+
+                .link-row a {
+                    color: #212121;
+                    text-decoration: none;
+                    font-weight: 500;
+                }
+
+                    .link-row a:hover {
+                        text-decoration: underline;
+                    }
+
+            .alert {
+                background: #fee2e2;
+                color: #991b1b;
+                border: 1px solid #fecaca;
+                border-radius: 6px;
+                padding: 10px;
+                margin-bottom: 16px;
+                font-size: 14px;
+            }
+    </style>
+</head>
+
+<body>
+    <div class="login-box">
+        <div class="title">病理教學系統</div>
+        <div class="sub">請選擇身分後登入</div>
+
+        @if (TempData["Message"] != null)
+        {
+            <div class="alert">@TempData["Message"]</div>
+        }
+
+        <form method="post" action="/Home/Login">
+            <div class="role-row">
+                <label class="role-card">
+                    <input type="radio"
+                           name="role"
+                           value="Student"
+                           checked />
+                    我是學生
+                </label>
+
+                <label class="role-card">
+                    <input type="radio"
+                           name="role"
+                           value="Teacher" />
+                    我是老師
+                </label>
+
+                <label class="role-card">
+                    <input type="radio"
+                           name="role"
+                           value="Admin" />
+                    我是管理員
+                </label>
+            </div>
+
+            <div class="fg">
+                <label>帳號</label>
+                <input type="text"
+                       name="loginId"
+                       placeholder="學生請輸入學號；老師請輸入教職員編號"
+                       required />
+            </div>
+
+            <div class="fg">
+                <label>密碼</label>
+                <input type="password" name="password" required />
+            </div>
+
+            <div class="fg">
+                <label>隨機驗證碼</label>
+                <div class="captcha-box">
+                    <div class="captcha-code">@ViewBag.Captcha</div>
+                    <input type="text" name="captcha" placeholder="輸入驗證碼" required />
+                </div>
+            </div>
+
+            <button class="btn" type="submit">登入</button>
+        </form>
+
+        <div class="link-row">
+            尚未有帳號？
+            <a href="/Home/Register">
+                前往註冊
+            </a>
+        </div>
+
+        <div class="link-row">
+            忘記密碼？
+            <a href="javascript:void(0);"
+               onclick="toggleForgotPassword()">
+                密碼重設
+            </a>
+        </div>
+
+        <div id="forgot-password-info"
+             style="
+            display:none;
+            margin-top:12px;
+            padding:12px 14px;
+            border:1px solid #fecaca;
+            border-radius:8px;
+            background:#fef2f2;
+            color:#dc2626;
+            font-size:13px;
+            line-height:1.8;
+            text-align:left;">
+
+            若忘記登入密碼，請聯絡系統管理員協助重設。<br />
+            學生請提供學號，老師請提供教職員編號。
+
+        </div>
+    </div>
+    <script>
+            function toggleForgotPassword() {
+                const info =
+                    document.getElementById(
+                        'forgot-password-info'
+                    );
+
+                if (!info) {
+                    return;
+                }
+
+                if (info.style.display === 'none' ||
+                    info.style.display === '') {
+
+                    info.style.display = 'block';
+                }
+                else {
+                    info.style.display = 'none';
+                }
+            }
+    </script>
+</body>
+</html>

@@ -1,0 +1,2768 @@
+﻿@using Microsoft.AspNetCore.Http
+@{
+    ViewBag.Title = "病歷影像 — 病理教學系統";
+
+    string role =
+        Context.Session.GetString("Role") ?? "";
+
+    bool isTeacher =
+        role == "Teacher" ||
+        role == "Admin";
+
+    bool isStudent =
+        role == "Student";
+
+    string rowKey =
+        ViewBag.RowKey as string
+        ?? "";
+
+    string contentType =
+        ViewBag.ContentType as string
+        ?? "";
+
+    string mediaType =
+        ViewBag.MediaType as string
+        ?? "";
+
+    bool hasSearch =
+        ViewBag.HasSearch is bool search
+        && search;
+
+    int resultCount =
+        ViewBag.ResultCount is int count
+            ? count
+            : 0;
+
+    int mediaIndex =
+        ViewBag.MediaIndex is int index
+            ? index
+            : 0;
+
+    string selectedImagePath =
+        ViewBag.SelectedImagePath as string
+        ?? "";
+
+    string selectedImageId =
+        ViewBag.SelectedImageId as string
+        ?? "";
+
+    string selectedImageNote =
+        ViewBag.SelectedImageNote as string
+        ?? "";
+
+    string selectedDrawingJson =
+        ViewBag.SelectedDrawingJson as string
+        ?? "[]";
+
+    string selectedAnnotatedImagePath =
+        ViewBag.SelectedAnnotatedImagePath as string
+        ?? "";
+
+    string displayImagePath =
+        isStudent &&
+        !string.IsNullOrWhiteSpace(
+            selectedAnnotatedImagePath
+        )
+            ? selectedAnnotatedImagePath
+            : selectedImagePath;
+
+    bool isKaggleReferenceImage =
+        (
+            selectedImageNote?.Contains(
+                "Kaggle 教學參考影像",
+                StringComparison.OrdinalIgnoreCase
+            )
+            ?? false
+        )
+        ||
+        (
+            selectedImagePath?.Contains(
+                "/medical-images/kaggle/",
+                StringComparison.OrdinalIgnoreCase
+            )
+            ?? false
+        );
+
+    string selectedVideoPath =
+        ViewBag.SelectedVideoPath as string
+        ?? "";
+
+    string selectedVideoNote =
+        ViewBag.SelectedVideoNote as string
+        ?? "";
+
+    string selectedVideoCategory =
+        ViewBag.SelectedVideoCategory as string
+        ?? "未分類";
+
+    bool selectedVideoIsAlive =
+        ViewBag.SelectedVideoIsAlive is bool alive
+        && alive;
+
+    string contentLabel =
+    contentType == "course"
+        ? "解剖"
+        : contentType == "medical"
+            ? "病歷"
+            : contentType == "pathology"
+                ? "病理切片"
+                : "";
+
+    string mediaLabel =
+        mediaType == "image"
+            ? "照片"
+            : mediaType == "video"
+                ? "影片"
+                : "";
+
+    int drawingIndex =
+        contentType == "medical"
+            ? 20000
+            : 10000;
+}
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewBag.Title</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet" />
+    <style>
+            :root {
+                --bg: #ffffff;
+                --bg2: #ffffff;
+                --bg3: #f4f4f4;
+                --border: #e5e5e5;
+                --border2: #d4d4d4;
+                --accent: #212121;
+                --accent2: #000000;
+                --text: #212121;
+                --text2: #676767;
+                --text3: #969696;
+                /* 功能性色彩保留 */
+                --success: #16a34a;
+                --success-bg: rgba(22, 163, 74, 0.12);
+                --red: #dc2626;
+                --red-bg: rgba(220, 38, 38, 0.12);
+                --radius: 9px;
+                --radius-lg: 16px;
+            }
+
+            *, *::before, *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                background: var(--bg);
+                color: var(--text);
+                font-family: 'Noto Sans TC', sans-serif;
+                font-weight: 300;
+                font-size: 14px;
+                line-height: 1.7;
+                min-height: 100vh;
+            }
+
+            .topbar {
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                padding: 0 28px;
+                height: 58px;
+                border-bottom: 1px solid var(--border);
+                background: var(--bg2);
+            }
+
+            .topbar-logo {
+                font-family: 'Noto Serif TC',serif;
+                font-size: 50px;
+                font-weight: 700;
+                color: var(--accent);
+                letter-spacing: 2px;
+            }
+
+            .topbar a {
+                color: var(--text2);
+                text-decoration: none;
+                font-size: 13px;
+            }
+
+                .topbar a:hover {
+                    color: var(--accent);
+                }
+
+            .content {
+                max-width: 1100px;
+                margin: 0 auto;
+                padding: 32px 28px;
+            }
+
+            .page-header {
+                display: flex;
+                align-items: baseline;
+                gap: 14px;
+                margin-bottom: 28px;
+                padding-bottom: 18px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .page-title {
+                font-family: 'Noto Serif TC',serif;
+                font-size: 22px;
+                font-weight: 600;
+            }
+
+            .page-row-key {
+                font-size: 13px;
+                color: #676767;
+                background: #f4f4f4;
+                border: 1px solid #d4d4d4;
+                border-radius: var(--radius);
+                padding: 2px 10px;
+            }
+
+            /* ── 整體畫布區塊 ── */
+            .img-block {
+                display: none;
+            }
+
+                .img-block.active {
+                    display: block;
+                }
+
+            /* 左右並排：畫布 + 筆畫清單 */
+            .img-layout {
+                display: grid;
+                grid-template-columns: 1fr 300px;
+                gap: 20px;
+                align-items: start;
+            }
+
+            @@media (max-width: 860px) {
+                .img-layout {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            /* ── 畫布 frame ── */
+            .img-frame {
+                position: relative;
+                width: 100%;
+            }
+
+                .img-frame img {
+                    width: 100%;
+                    max-width: 100%;
+                    display: block;
+                    border-radius: var(--radius);
+                    border: 1px solid var(--border2);
+                    pointer-events: none;
+                }
+
+                .img-frame canvas {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    border-radius: var(--radius);
+                    z-index: 10;
+                    cursor: crosshair;
+                }
+
+            /* ── 工具列 ── */
+            .toolbar {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                align-items: center;
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                border-radius: 10px;
+                padding: 10px 12px;
+                margin-top: 12px;
+            }
+
+            .toolbar-sep {
+                width: 1px;
+                height: 20px;
+                background: var(--border2);
+                margin: 0 2px;
+            }
+
+            .btn {
+                height: 30px;
+                padding: 0 13px;
+                border: 1px solid #d4d4d4;
+                border-radius: var(--radius);
+                background: #ffffff;
+                color: #212121;
+                font-size: 13px;
+                font-family: inherit;
+                cursor: pointer;
+                white-space: nowrap;
+                transition: all 0.15s;
+            }
+
+                .btn:hover {
+                    background: #f1f1f1;
+                    border-color: #c7c7c7;
+                    color: #212121;
+                }
+
+                .btn.active-tool {
+                    background: #212121;
+                    color: #ffffff;
+                    border-color: #212121;
+                }
+
+            .btn-primary {
+                background: #212121;
+                border-color: #212121;
+                color: #ffffff;
+            }
+
+                .btn-primary:hover {
+                    background: #000000;
+                    border-color: #000000;
+                }
+
+            .btn-success {
+                border-color: rgba(74,156,109,0.4);
+                color: #5cb88a;
+            }
+
+                .btn-success:hover {
+                    background: var(--success-bg);
+                }
+
+            .btn-danger {
+                border-color: rgba(220,38,38,0.4);
+                color: var(--red);
+            }
+
+                .btn-danger:hover {
+                    background: var(--red-bg);
+                }
+
+            /* ── 徽章 ── */
+            .badge {
+                display: inline-block;
+                padding: 3px 10px;
+                border-radius: 3px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            .badge-alive {
+                background: var(--red-bg);
+                color: #e05c4a;
+                border: 1px solid rgba(192,57,43,0.3);
+            }
+
+            .badge-dead {
+                background: var(--bg3);
+                color: var(--text3);
+                border: 1px solid var(--border2);
+            }
+
+            /* ── 教學說明框 ── */
+            .note-box {
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                border-left: 3px solid #969696;
+                border-radius: var(--radius);
+                padding: 12px 16px;
+                margin-top: 12px;
+            }
+
+            .note-label {
+                font-size: 11px;
+                letter-spacing: 1.5px;
+                text-transform: uppercase;
+                color: #676767;
+                margin-bottom: 6px;
+            }
+
+            .note-text {
+                font-size: 14px;
+                color: #676767;
+                line-height: 1.8;
+            }
+
+            /* ── 筆畫清單面板（右欄） ── */
+            .stroke-panel {
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                border-radius: 16px;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                max-height: 700px;
+            }
+
+            .stroke-panel-head {
+                background: #f7f7f8;
+                padding: 10px 14px;
+                font-size: 12px;
+                letter-spacing: 1px;
+                text-transform: uppercase;
+                color: #676767;
+                border-bottom: 1px solid #e5e5e5;
+                flex-shrink: 0;
+            }
+
+            .stroke-list {
+                flex: 1;
+                overflow-y: auto;
+                padding: 8px;
+            }
+
+            .stroke-item {
+                border: 1px solid #e5e5e5;
+                border-radius: var(--radius);
+                padding: 8px 10px;
+                margin-bottom: 8px;
+                background: #ffffff;
+                transition: border-color .15s;
+            }
+
+                .stroke-item:hover {
+                    border-color: #969696;
+                }
+
+            .stroke-item-head {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 6px;
+            }
+
+            .stroke-swatch {
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                border: 2px solid white;
+                box-shadow: 0 1px 3px rgba(0,0,0,.25);
+                flex-shrink: 0;
+            }
+
+            .stroke-tool-tag {
+                font-size: 11px;
+                background: var(--bg3);
+                color: var(--text3);
+                border-radius: 3px;
+                padding: 1px 6px;
+                border: 1px solid var(--border);
+            }
+
+            .stroke-num {
+                font-size: 11px;
+                color: var(--text3);
+                margin-left: auto;
+            }
+
+            .stroke-comment-input {
+                width: 100%;
+                padding: 4px 8px;
+                font-size: 13px;
+                border: 1px solid #d4d4d4;
+                border-radius: 6px;
+                background: #f4f4f4;
+                color: #212121;
+                font-family: inherit;
+                resize: none;
+                min-height: 36px;
+                transition: border-color .15s;
+            }
+
+                .stroke-comment-input:focus {
+                    outline: none;
+                    border-color: #969696;
+                    background: #ffffff;
+                }
+
+                .stroke-comment-input::placeholder {
+                    color: var(--text3);
+                }
+
+            .stroke-del {
+                background: none;
+                border: none;
+                color: var(--text3);
+                cursor: pointer;
+                font-size: 14px;
+                padding: 0 4px;
+                line-height: 1;
+            }
+
+                .stroke-del:hover {
+                    color: var(--red);
+                }
+
+            /* 標記數字標籤（疊在 canvas 上） */
+            .stroke-label-overlay {
+                position: absolute;
+                z-index: 20;
+                pointer-events: none;
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: rgba(0,0,0,0.65);
+                color: #fff;
+                font-size: 11px;
+                font-weight: bold;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transform: translate(-50%,-50%);
+                box-shadow: 0 1px 4px rgba(0,0,0,.4);
+            }
+
+            /* 行內彈出式註解框（canvas 正下方浮現） */
+            .inline-comment-bubble {
+                position: absolute;
+                z-index: 50;
+                background: #ffffff;
+                border: 1px solid #d4d4d4;
+                border-radius: 10px;
+                padding: 10px 12px;
+                box-shadow: 0 4px 16px rgba(0,0,0,.12);
+                min-width: 220px;
+                max-width: 280px;
+                display: none;
+            }
+
+                .inline-comment-bubble textarea {
+                    width: 100%;
+                    border: 1px solid #d4d4d4;
+                    border-radius: 6px;
+                    padding: 5px 8px;
+                    font-size: 13px;
+                    font-family: inherit;
+                    resize: none;
+                    min-height: 52px;
+                    outline: none;
+                    background: #f4f4f4;
+                }
+
+                    .inline-comment-bubble textarea:focus {
+                        border-color: #969696;
+                        background: #ffffff;
+                    }
+
+            .inline-comment-bubble-btns {
+                display: flex;
+                gap: 6px;
+                margin-top: 6px;
+                justify-content: flex-end;
+            }
+
+            .bubble-title {
+                font-size: 12px;
+                color: #676767;
+                font-weight: 500;
+                margin-bottom: 5px;
+            }
+            /* empty state */
+            .empty-state {
+                text-align: center;
+                padding: 80px 20px;
+                color: var(--text3);
+            }
+
+            .empty-state-icon {
+                font-size: 48px;
+                margin-bottom: 14px;
+                opacity: .25;
+            }
+
+            .empty-state-title {
+                font-size: 16px;
+                color: var(--text2);
+                margin-bottom: 6px;
+            }
+
+            .reference-warning {
+                margin-bottom: 14px;
+                padding: 14px 16px;
+                border: 1px solid #f59e0b;
+                border-left: 5px solid #d97706;
+                border-radius: 10px;
+                background: #fffbeb;
+                color: #92400e;
+            }
+
+            .reference-warning-title {
+                font-size: 14px;
+                font-weight: 700;
+                margin-bottom: 4px;
+            }
+
+            .reference-warning-text {
+                font-size: 13px;
+                line-height: 1.7;
+            }
+
+            .reference-badge {
+                display: inline-flex;
+                align-items: center;
+                min-height: 26px;
+                margin: 0 0 10px 0;
+                padding: 3px 10px;
+                border-radius: 999px;
+                border: 1px solid #f59e0b;
+                background: #fff7ed;
+                color: #9a3412;
+                font-size: 12px;
+                font-weight: 700;
+            }
+
+            ::-webkit-scrollbar {
+                width: 6px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: var(--border2);
+                border-radius: 3px;
+            }
+    </style>
+
+    <style>
+            .search-panel {
+                background: #ffffff;
+                border: 1px solid var(--border);
+                border-radius: var(--radius-lg);
+                padding: 18px;
+                margin-bottom: 24px;
+            }
+
+            .search-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr auto;
+                gap: 12px;
+                align-items: end;
+            }
+
+            .search-field label {
+                display: block;
+                font-size: 12px;
+                color: var(--text2);
+                margin-bottom: 6px;
+            }
+
+            .search-field select {
+                width: 100%;
+                height: 38px;
+                border: 1px solid var(--border2);
+                border-radius: var(--radius);
+                padding: 0 10px;
+                background: #ffffff;
+                color: var(--text);
+                font-family: inherit;
+                font-size: 14px;
+            }
+
+            .search-button {
+                height: 38px;
+                min-width: 90px;
+            }
+
+            .btn:disabled {
+                opacity: .4;
+                cursor: not-allowed;
+            }
+
+            .result-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 14px;
+            }
+
+            .result-count {
+                font-size: 13px;
+                color: var(--text3);
+            }
+
+            .pager {
+                display: flex;
+                gap: 8px;
+                justify-content: center;
+                margin-top: 22px;
+            }
+
+                .pager .btn {
+                    text-decoration: none;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+            .media-card {
+                background: #ffffff;
+                border: 1px solid var(--border);
+                border-radius: var(--radius-lg);
+                padding: 16px;
+            }
+
+            @@media (max-width: 760px) {
+                .search-row {
+                    grid-template-columns: 1fr;
+                }
+
+                .search-button {
+                    width: 100%;
+                }
+            }
+    </style>
+
+</head>
+
+<body>
+
+    <header class="topbar">
+        <div class="topbar-logo">
+            病理教學系統
+        </div>
+
+        <span style="
+            color:var(--border2);
+            font-size:16px;">
+            ›
+        </span>
+
+        <span style="
+            font-size:20px;
+            color:var(--text2);">
+            病歷影像
+        </span>
+
+        <div style="flex:1;"></div>
+
+        <a href="/Home/Index">
+            ← 返回列表
+        </a>
+    </header>
+
+
+    <div class="content">
+
+        <div class="page-header">
+            <span class="page-title">
+                病歷影像
+            </span>
+
+            @if (!string.IsNullOrWhiteSpace(rowKey))
+            {
+                <span class="page-row-key">
+                    @rowKey
+                </span>
+            }
+        </div>
+
+
+        <!-- =========================================================
+         查詢條件
+         ========================================================= -->
+        <div class="search-panel">
+
+            <form method="get"
+                  action="@Url.Action("Image", "Home")"
+                  id="mediaSearchForm">
+
+                <input type="hidden"
+                       name="row"
+                       value="@rowKey" />
+
+                <div class="search-row">
+
+                    <div class="search-field">
+                        <label for="contentType">
+                            資料類型
+                        </label>
+
+                        <select id="contentType"
+                                name="contentType">
+
+                            <option value="">
+                                請選擇
+                            </option>
+
+                            <option value="course"
+                                    selected="@(contentType == "course" ? "selected" : null)">
+                                解剖
+                            </option>
+
+                            <option value="medical"
+                                    selected="@(contentType == "medical" ? "selected" : null)">
+                                病歷
+                            </option>
+
+                            <option value="pathology"
+                                    selected="@(contentType == "pathology" ? "selected" : null)">
+                                病理切片
+                            </option>
+
+                        </select>
+                    </div>
+
+
+                    <div class="search-field">
+                        <label for="mediaType">
+                            媒體類型
+                        </label>
+
+                        <select id="mediaType"
+                                name="mediaType">
+
+                            <option value="">
+                                請選擇
+                            </option>
+
+                            <option value="image"
+                                    selected="@(mediaType == "image" ? "selected" : null)">
+                                照片
+                            </option>
+
+                            <option value="video"
+                                    selected="@(mediaType == "video" ? "selected" : null)">
+                                影片
+                            </option>
+
+                        </select>
+                    </div>
+
+
+                    <button type="submit"
+                            id="searchButton"
+                            class="btn btn-primary search-button"
+                            disabled>
+                        查詢
+                    </button>
+
+                </div>
+            </form>
+        </div>
+
+
+        <!-- =========================================================
+         初次進入：不顯示任何照片 / 影片
+         ========================================================= -->
+        @if (!hasSearch)
+        {
+            <div class="empty-state">
+
+                <div class="empty-state-icon">
+                    🔎
+                </div>
+
+                <div class="empty-state-title">
+                    請選擇查詢條件
+                </div>
+
+                <div style="
+                    font-size:13px;
+                    margin-top:6px;">
+                    請先選擇「解剖／病歷」與「照片／影片」後再按查詢。
+                </div>
+
+            </div>
+        }
+
+        <!-- =========================================================
+         查無資料
+         ========================================================= -->
+        @if (hasSearch && resultCount == 0)
+        {
+            <div class="empty-state">
+
+                <div class="empty-state-icon">
+                    @(mediaType == "video" ? "🎬" : "🖼")
+                </div>
+
+                <div class="empty-state-title">
+                    查無符合條件的資料
+                </div>
+
+                <div style="
+                    font-size:13px;
+                    margin-top:6px;">
+                    目前沒有「@contentLabel / @mediaLabel」資料。
+                </div>
+
+            </div>
+        }
+
+        <!-- =========================================================
+         照片：一次只顯示一張
+         ========================================================= -->
+        @if (hasSearch && resultCount > 0 && mediaType == "image")
+        {
+            <div class="result-head">
+
+                <div>
+                    <div class="page-title"
+                         style="font-size:18px;">
+                        @contentLabel 照片
+                    </div>
+                </div>
+
+                <div class="result-count">
+                    @(mediaIndex + 1) / @resultCount
+                </div>
+
+            </div>
+
+
+            @if (isKaggleReferenceImage)
+            {
+                <div class="reference-warning">
+                    <div class="reference-warning-title">
+                        教學參考影像 / Kaggle Chest X-Ray
+                    </div>
+
+                    <div class="reference-warning-text">
+                        此影像僅供教學參考，非此病人的真實醫療影像，
+                        不可作為此病人的診斷、病歷事實或臨床判讀依據。
+                    </div>
+                </div>
+            }
+
+            <div class="media-card">
+
+                <div class="img-layout"
+                     style="@(isTeacher ? "" : "grid-template-columns:1fr;")">
+
+                    <!-- 左側：圖片與畫圖工具 -->
+                    <div>
+
+                        <div style="position:relative;"
+                             id="canvaswrap_@drawingIndex">
+
+                            @if (isKaggleReferenceImage)
+                            {
+                                <div class="reference-badge">
+                                    非此病人真實影像
+                                </div>
+                            }
+
+                            <div class="img-frame"
+                                 id="frame_@drawingIndex">
+
+                                <img id="img_@drawingIndex"
+                                     src="@displayImagePath"
+                                     alt="@contentLabel 照片 @(mediaIndex + 1)" />
+
+                                @if (isTeacher)
+                                {
+                                    <canvas id="canvas_@drawingIndex">
+                                    </canvas>
+                                }
+
+                            </div>
+
+
+                            @if (isTeacher)
+                            {
+                                <div class="inline-comment-bubble"
+                                     id="bubble_@drawingIndex">
+
+                                    <div class="bubble-title">
+                                        💬 為此標記加上說明
+                                    </div>
+
+                                    <textarea id="bubble_text_@drawingIndex"
+                                              placeholder="輸入說明文字（可留空）"
+                                              rows="2"></textarea>
+
+                                    <div class="inline-comment-bubble-btns">
+
+                                        <button type="button"
+                                                class="btn"
+                                                style="
+                                            height:26px;
+                                            font-size:12px;"
+                                                onclick="bubbleSkip(@drawingIndex)">
+                                            略過
+                                        </button>
+
+                                        <button type="button"
+                                                class="btn btn-primary"
+                                                style="
+                                            height:26px;
+                                            font-size:12px;"
+                                                onclick="bubbleConfirm(@drawingIndex)">
+                                            確認
+                                        </button>
+
+                                    </div>
+                                </div>
+                            }
+
+                        </div>
+
+
+                        @if (isTeacher)
+                        {
+                            <div class="toolbar"
+                                 id="toolbar_@drawingIndex">
+
+                                <button type="button"
+                                        class="btn active-tool"
+                                        id="tb_pen_@drawingIndex"
+                                        onclick="setTool(@drawingIndex,'pen')">
+                                    🖊 畫筆
+                                </button>
+
+                                <button type="button"
+                                        class="btn"
+                                        id="tb_arrow_@drawingIndex"
+                                        onclick="setTool(@drawingIndex,'arrow')">
+                                    ➤ 箭頭
+                                </button>
+
+                                <button type="button"
+                                        class="btn"
+                                        id="tb_rect_@drawingIndex"
+                                        onclick="setTool(@drawingIndex,'rect')">
+                                    ▭ 矩形
+                                </button>
+
+                                <button type="button"
+                                        class="btn"
+                                        id="tb_circle_@drawingIndex"
+                                        onclick="setTool(@drawingIndex,'circle')">
+                                    ◯ 圓形
+                                </button>
+
+                                <button type="button"
+                                        class="btn"
+                                        id="tb_line_@drawingIndex"
+                                        onclick="setTool(@drawingIndex,'line')">
+                                    ╱ 直線
+                                </button>
+
+                                <button type="button"
+                                        class="btn"
+                                        id="tb_text_@drawingIndex"
+                                        onclick="setTool(@drawingIndex,'text')">
+                                    T 文字
+                                </button>
+
+                                <button type="button"
+                                        class="btn"
+                                        id="tb_eraser_@drawingIndex"
+                                        onclick="setTool(@drawingIndex,'eraser')">
+                                    ✕ 橡皮擦
+                                </button>
+
+                                <div class="toolbar-sep"></div>
+
+                                <label style="
+                                    font-size:13px;
+                                    color:var(--text2);">
+                                    顏色
+                                </label>
+
+                                <input type="color"
+                                       id="color_@drawingIndex"
+                                       value="#e8b84b"
+                                       style="
+                                width:36px;
+                                height:30px;
+                                border:1px solid var(--border2);
+                                border-radius:4px;
+                                padding:1px;
+                                cursor:pointer;" />
+
+                                <select id="width_@drawingIndex"
+                                        style="
+                                    height:30px;
+                                    padding:0 6px;
+                                    border:1px solid var(--border2);
+                                    border-radius:4px;
+                                    font-size:13px;
+                                    background:var(--bg3);
+                                    color:var(--text);
+                                    cursor:pointer;">
+
+                                    <option value="2">
+                                        細
+                                    </option>
+
+                                    <option value="4"
+                                            selected>
+                                        中
+                                    </option>
+
+                                    <option value="8">
+                                        粗
+                                    </option>
+
+                                    <option value="14">
+                                        超粗
+                                    </option>
+
+                                </select>
+
+                                <div class="toolbar-sep"></div>
+
+                                <button type="button"
+                                        class="btn"
+                                        onclick="undoStroke(@drawingIndex)">
+                                    ↩ 復原
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-danger"
+                                        onclick="clearAllStrokes(@drawingIndex)">
+                                    🗑 清除全部
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-success"
+                                        id="savebtn_@drawingIndex"
+                                        onclick="saveDrawing(
+                                    '@rowKey',
+                                    '@selectedImageId',
+                                    '@contentType',
+                                    @drawingIndex
+                                    )">
+                                    💾 儲存標記
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-danger"
+                                        onclick="deleteImage(
+                                    '@rowKey',
+                                    '@selectedImagePath',
+                                    '@contentType'
+                                    )">
+                                    🗑 刪除照片
+                                </button>
+
+                            </div>
+                        }
+
+
+                        @if (!string.IsNullOrWhiteSpace(
+                                selectedImageNote))
+                        {
+                            <div class="note-box">
+
+                                <div class="note-label">
+                                    @(isKaggleReferenceImage
+                                        ? "教學參考影像說明"
+                                        : $"{contentLabel} 照片說明")
+                                </div>
+
+                                <div class="note-text">
+                                    @selectedImageNote
+                                </div>
+
+                            </div>
+                        }
+
+                    </div>
+
+
+                    <!-- 右側：標記清單 -->
+                    @if (isTeacher)
+                    {
+                        <div class="stroke-panel"
+                             id="panel_@drawingIndex">
+
+                            <div class="stroke-panel-head">
+                                🏷 標記與說明
+                            </div>
+
+                            <div class="stroke-list"
+                                 id="strokelist_@drawingIndex">
+
+                                <div style="
+                                    color:var(--text3);
+                                    font-size:13px;
+                                    text-align:center;
+                                    padding:20px 0;">
+                                    尚無標記
+                                </div>
+
+                            </div>
+                        </div>
+                    }
+
+                </div>
+            </div>
+
+
+            @if (isTeacher)
+            {
+                <script>
+                                    document.addEventListener(
+                                        'DOMContentLoaded',
+                                        function() {
+                                            initializeDrawingEditor(
+                                                                                        @drawingIndex,
+                                                                                        @Html.Raw(
+                                                                                                                        selectedDrawingJson == "[]"
+        ? "[]"
+        : selectedDrawingJson
+        ),
+                                                true
+                                            );
+                                        }
+                                    );
+                </script>
+            }
+        }
+
+        <!-- =========================================================
+         影片：一次只顯示一部
+         ========================================================= -->
+        @if (hasSearch && resultCount > 0 && mediaType == "video")
+        {
+            <div class="result-head">
+
+                <div>
+                    <div class="page-title"
+                         style="font-size:18px;">
+                        @contentLabel 影片
+                    </div>
+                </div>
+
+                <div class="result-count">
+                    @(mediaIndex + 1) / @resultCount
+                </div>
+
+            </div>
+
+
+            <div class="media-card">
+
+                <video controls
+                       style="
+                    width:100%;
+                    max-width:900px;
+                    display:block;
+                    margin:0 auto;
+                    border-radius:6px;
+                    border:1px solid var(--border2);">
+
+                    <source src="@selectedVideoPath"
+                            type="video/mp4" />
+
+                    您的瀏覽器不支援影片播放。
+                </video>
+
+
+                <div style="
+                    margin-top:12px;
+                    display:flex;
+                    gap:8px;
+                    flex-wrap:wrap;">
+
+                    @if (!string.IsNullOrWhiteSpace(
+                            selectedVideoCategory))
+                    {
+                        <span class="badge badge-dead">
+                            @selectedVideoCategory
+                        </span>
+                    }
+
+                    <span class="@(selectedVideoIsAlive
+                                                                                          ? "badge badge-alive"
+                                                                                          : "badge badge-dead")">
+
+                        @(selectedVideoIsAlive
+                            ? "生前影像"
+                            : "非生前影像")
+
+                    </span>
+
+                </div>
+
+
+                @if (!string.IsNullOrWhiteSpace(
+                        selectedVideoNote))
+                {
+                    <div class="note-box">
+
+                        <div class="note-label">
+                            @contentLabel 影片說明
+                        </div>
+
+                        <div class="note-text">
+                            @selectedVideoNote
+                        </div>
+
+                    </div>
+                }
+
+
+                @if (isTeacher)
+                {
+                    <div style="
+                        margin-top:14px;
+                        display:flex;
+                        gap:8px;">
+
+                        <button type="button"
+                                class="btn btn-danger"
+                                onclick="deleteVideo(
+                            '@rowKey',
+                            '@selectedVideoPath'
+                            )">
+                            🗑 刪除影片
+                        </button>
+
+                    </div>
+                }
+
+            </div>
+        }
+
+
+        <!-- =========================================================
+         上一筆 / 下一筆
+         ========================================================= -->
+        @if (hasSearch && resultCount > 0)
+        {
+            <div class="pager">
+
+                @if (mediaIndex > 0)
+                {
+                    <a class="btn btn-primary"
+                       href="@Url.Action(
+                                                                                            "Image",
+                                                                                            "Home",
+                                                                                            new
+                                                                                            {
+                                                                                                row = rowKey,
+                                                                                                contentType = contentType,
+                                                                                                mediaType = mediaType,
+                                                                                                mediaIndex = mediaIndex - 1
+                                                                                            }
+                                                                                        )">
+                        ← 上一筆
+                    </a>
+                }
+
+                @if (mediaIndex < resultCount - 1)
+                {
+                    <a class="btn btn-primary"
+                       href="@Url.Action(
+                                                                                            "Image",
+                                                                                            "Home",
+                                                                                            new
+                                                                                            {
+                                                                                                row = rowKey,
+                                                                                                contentType = contentType,
+                                                                                                mediaType = mediaType,
+                                                                                                mediaIndex = mediaIndex + 1
+                                                                                            }
+                                                                                        )">
+                        下一筆 →
+                    </a>
+                }
+
+            </div>
+        }
+
+    </div>
+
+
+    <script>
+            document.addEventListener(
+                'DOMContentLoaded',
+                function() {
+
+                    const contentType =
+                        document.getElementById(
+                            'contentType'
+                        );
+
+                    const mediaType =
+                        document.getElementById(
+                            'mediaType'
+                        );
+
+                    const searchButton =
+                        document.getElementById(
+                            'searchButton'
+                        );
+
+                    function updateSearchButton() {
+
+                        if (
+                            !contentType ||
+                            !mediaType ||
+                            !searchButton
+                        ) {
+                            return;
+                        }
+
+                        searchButton.disabled =
+                            contentType.value === '' ||
+                            mediaType.value === '';
+                    }
+
+                    contentType.addEventListener(
+                        'change',
+                        updateSearchButton
+                    );
+
+                    mediaType.addEventListener(
+                        'change',
+                        updateSearchButton
+                    );
+
+                    updateSearchButton();
+                }
+            );
+    </script>
+
+    <script>
+            /* ═══════════════════════════════════════════
+               全域畫圖 / 儲存 / 刪除功能
+            ═══════════════════════════════════════════ */
+            function initializeDrawingEditor(
+                IDX,
+                initJson,
+                CAN_EDIT
+            ) {
+                var strokes = [];
+
+                var curTool =
+                    'pen';
+
+                var isDrawing =
+                    false;
+
+                var startX = 0;
+                var startY = 0;
+
+                var snapData =
+                    null;
+
+                var pendingStrokeIdx =
+                    -1;
+
+
+                var imgEl =
+                    document.getElementById(
+                        'img_' + IDX
+                    );
+
+                var canvas =
+                    document.getElementById(
+                        'canvas_' + IDX
+                    );
+
+                if (!imgEl || !canvas) {
+                    return;
+                }
+
+                var ctx =
+                    canvas.getContext('2d');
+
+                var bubble =
+                    document.getElementById(
+                        'bubble_' + IDX
+                    );
+
+                var bubbleTx =
+                    document.getElementById(
+                        'bubble_text_' + IDX
+                    );
+
+
+                if (!CAN_EDIT) {
+                    canvas.style.pointerEvents =
+                        'none';
+
+                    canvas.style.cursor =
+                        'default';
+                }
+
+
+                try {
+                    strokes =
+                        Array.isArray(initJson)
+                            ? initJson
+                            : JSON.parse(
+                                initJson || '[]'
+                            );
+                }
+                catch (e) {
+                    strokes =
+                        [];
+                }
+
+
+                function resize() {
+                    var rect =
+                        imgEl.getBoundingClientRect();
+
+                    if (rect.width === 0) {
+                        return;
+                    }
+
+                    canvas.width =
+                        rect.width;
+
+                    canvas.height =
+                        rect.height;
+
+                    canvas.style.width =
+                        rect.width + 'px';
+
+                    canvas.style.height =
+                        rect.height + 'px';
+
+                    redraw();
+                    renderOverlays();
+                }
+
+
+                function tryResize() {
+                    var rect =
+                        imgEl.getBoundingClientRect();
+
+                    if (rect.width === 0) {
+                        setTimeout(
+                            tryResize,
+                            80
+                        );
+
+                        return;
+                    }
+
+                    resize();
+                }
+
+
+                function paintStroke(c, s) {
+                    c.save();
+
+                    c.strokeStyle =
+                        s.color || '#e8b84b';
+
+                    c.fillStyle =
+                        s.color || '#e8b84b';
+
+                    c.lineWidth =
+                        +(s.width || 4);
+
+                    c.lineCap =
+                        'round';
+
+                    c.lineJoin =
+                        'round';
+
+                    var pts =
+                        s.points || [];
+
+
+                    if (s.tool === 'pen') {
+                        if (pts.length < 2) {
+                            c.restore();
+                            return;
+                        }
+
+                        c.beginPath();
+
+                        pts.forEach(
+                            function(p, i) {
+                                if (i === 0) {
+                                    c.moveTo(
+                                        p[0],
+                                        p[1]
+                                    );
+                                }
+                                else {
+                                    c.lineTo(
+                                        p[0],
+                                        p[1]
+                                    );
+                                }
+                            }
+                        );
+
+                        c.stroke();
+                    }
+
+
+                    else if (
+                        s.tool === 'eraser'
+                    ) {
+                        c.globalCompositeOperation =
+                            'destination-out';
+
+                        c.lineWidth =
+                            +(s.width || 4) * 4;
+
+                        c.beginPath();
+
+                        pts.forEach(
+                            function(p, i) {
+                                if (i === 0) {
+                                    c.moveTo(
+                                        p[0],
+                                        p[1]
+                                    );
+                                }
+                                else {
+                                    c.lineTo(
+                                        p[0],
+                                        p[1]
+                                    );
+                                }
+                            }
+                        );
+
+                        c.stroke();
+                    }
+
+
+                    else if (
+                        s.tool === 'line' &&
+                        pts.length >= 2
+                    ) {
+                        c.beginPath();
+
+                        c.moveTo(
+                            pts[0][0],
+                            pts[0][1]
+                        );
+
+                        c.lineTo(
+                            pts[pts.length - 1][0],
+                            pts[pts.length - 1][1]
+                        );
+
+                        c.stroke();
+                    }
+
+
+                    else if (
+                        s.tool === 'arrow' &&
+                        pts.length >= 2
+                    ) {
+                        var x1 =
+                            pts[0][0];
+
+                        var y1 =
+                            pts[0][1];
+
+                        var x2 =
+                            pts[pts.length - 1][0];
+
+                        var y2 =
+                            pts[pts.length - 1][1];
+
+                        c.beginPath();
+
+                        c.moveTo(
+                            x1,
+                            y1
+                        );
+
+                        c.lineTo(
+                            x2,
+                            y2
+                        );
+
+                        c.stroke();
+
+                        var angle =
+                            Math.atan2(
+                                y2 - y1,
+                                x2 - x1
+                            );
+
+                        var headSize =
+                            Math.max(
+                                14,
+                                +(s.width || 4) * 3.5
+                            );
+
+                        c.beginPath();
+
+                        c.moveTo(
+                            x2,
+                            y2
+                        );
+
+                        c.lineTo(
+                            x2 -
+                            headSize *
+                            Math.cos(
+                                angle - 0.42
+                            ),
+
+                            y2 -
+                            headSize *
+                            Math.sin(
+                                angle - 0.42
+                            )
+                        );
+
+                        c.lineTo(
+                            x2 -
+                            headSize *
+                            Math.cos(
+                                angle + 0.42
+                            ),
+
+                            y2 -
+                            headSize *
+                            Math.sin(
+                                angle + 0.42
+                            )
+                        );
+
+                        c.closePath();
+                        c.fill();
+                    }
+
+
+                    else if (
+                        s.tool === 'rect' &&
+                        pts.length >= 2
+                    ) {
+                        var rx =
+                            pts[0][0];
+
+                        var ry =
+                            pts[0][1];
+
+                        var rw =
+                            pts[pts.length - 1][0] -
+                            rx;
+
+                        var rh =
+                            pts[pts.length - 1][1] -
+                            ry;
+
+                        c.strokeRect(
+                            rx,
+                            ry,
+                            rw,
+                            rh
+                        );
+                    }
+
+
+                    else if (
+                        s.tool === 'circle' &&
+                        pts.length >= 2
+                    ) {
+                        var cx =
+                            pts[0][0];
+
+                        var cy =
+                            pts[0][1];
+
+                        var radiusX =
+                            Math.abs(
+                                pts[pts.length - 1][0] -
+                                cx
+                            );
+
+                        var radiusY =
+                            Math.abs(
+                                pts[pts.length - 1][1] -
+                                cy
+                            );
+
+                        c.beginPath();
+
+                        c.ellipse(
+                            cx,
+                            cy,
+                            Math.max(radiusX, 1),
+                            Math.max(radiusY, 1),
+                            0,
+                            0,
+                            Math.PI * 2
+                        );
+
+                        c.stroke();
+                    }
+
+
+                    else if (
+                        s.tool === 'text' &&
+                        pts.length >= 1
+                    ) {
+                        var fontSize =
+                            Math.max(
+                                14,
+                                +(s.width || 4) * 3 + 8
+                            );
+
+                        c.font =
+                            'bold ' +
+                            fontSize +
+                            'px "Noto Sans TC", sans-serif';
+
+                        c.fillText(
+                            s.text || '',
+                            pts[0][0],
+                            pts[0][1]
+                        );
+                    }
+
+
+                    c.restore();
+                }
+
+
+                function redraw() {
+                    ctx.clearRect(
+                        0,
+                        0,
+                        canvas.width,
+                        canvas.height
+                    );
+
+                    strokes.forEach(
+                        function(s) {
+                            paintStroke(
+                                ctx,
+                                s
+                            );
+                        }
+                    );
+                }
+
+
+                function anchorPoint(s) {
+                    var pts =
+                        s.points || [];
+
+                    if (!pts.length) {
+                        return null;
+                    }
+
+                    if (
+                        s.tool === 'text' ||
+                        s.tool === 'pen' ||
+                        s.tool === 'eraser'
+                    ) {
+                        return pts[0];
+                    }
+
+                    return pts[
+                        pts.length - 1
+                    ];
+                }
+
+
+                function renderOverlays() {
+                    var frame =
+                        document.getElementById(
+                            'frame_' + IDX
+                        );
+
+                    if (!frame) {
+                        return;
+                    }
+
+                    frame
+                        .querySelectorAll(
+                            '.stroke-label-overlay'
+                        )
+                        .forEach(
+                            function(el) {
+                                el.remove();
+                            }
+                        );
+
+
+                    var visible =
+                        strokes.filter(
+                            function(s) {
+                                return s.tool !==
+                                    'eraser';
+                            }
+                        );
+
+
+                    visible.forEach(
+                        function(s, vi) {
+                            var pt =
+                                anchorPoint(s);
+
+                            if (!pt) {
+                                return;
+                            }
+
+                            var label =
+                                document.createElement(
+                                    'div'
+                                );
+
+                            label.className =
+                                'stroke-label-overlay';
+
+                            label.textContent =
+                                vi + 1;
+
+                            label.style.left =
+                                pt[0] + 'px';
+
+                            label.style.top =
+                                pt[1] + 'px';
+
+                            label.style.background =
+                                s.color || '#333';
+
+                            frame.appendChild(
+                                label
+                            );
+                        }
+                    );
+                }
+
+
+                function getPos(e) {
+                    var rect =
+                        canvas.getBoundingClientRect();
+
+                    var clientX =
+                        e.clientX;
+
+                    var clientY =
+                        e.clientY;
+
+                    return [
+                        (clientX - rect.left) *
+                        (canvas.width / rect.width),
+
+                        (clientY - rect.top) *
+                        (canvas.height / rect.height)
+                    ];
+                }
+
+
+                function makeStroke(
+                    tool,
+                    points,
+                    text
+                ) {
+                    var colorInput =
+                        document.getElementById(
+                            'color_' + IDX
+                        );
+
+                    var widthInput =
+                        document.getElementById(
+                            'width_' + IDX
+                        );
+
+                    return {
+                        tool: tool,
+
+                        color:
+                            colorInput
+                                ? colorInput.value
+                                : '#e8b84b',
+
+                        width:
+                            widthInput
+                                ? parseInt(
+                                    widthInput.value
+                                )
+                                : 4,
+
+                        points: points,
+
+                        text:
+                            text || '',
+
+                        comment:
+                            ''
+                    };
+                }
+
+
+                function showBubble(x, y) {
+                    if (!bubble ||
+                        !bubbleTx) {
+                        pendingStrokeIdx =
+                            -1;
+
+                        renderList();
+
+                        return;
+                    }
+
+                    bubble.style.left =
+                        Math.max(
+                            4,
+                            x + 12
+                        ) + 'px';
+
+                    bubble.style.top =
+                        (y + 8) + 'px';
+
+                    bubble.style.display =
+                        'block';
+
+                    bubbleTx.value =
+                        '';
+
+                    bubbleTx.focus();
+                }
+
+
+                function hideBubble() {
+                    if (bubble) {
+                        bubble.style.display =
+                            'none';
+                    }
+                }
+
+
+                function escapeHtml(value) {
+                    return String(
+                        value || ''
+                    )
+                        .replace(
+                            /&/g,
+                            '&amp;'
+                        )
+                        .replace(
+                            /</g,
+                            '&lt;'
+                        )
+                        .replace(
+                            />/g,
+                            '&gt;'
+                        );
+                }
+
+
+                function renderList() {
+                    var element =
+                        document.getElementById(
+                            'strokelist_' + IDX
+                        );
+
+                    if (!element) {
+                        return;
+                    }
+
+                    var visible =
+                        strokes.filter(
+                            function(s) {
+                                return s.tool !==
+                                    'eraser';
+                            }
+                        );
+
+                    if (!visible.length) {
+                        element.innerHTML =
+                            '<div style="' +
+                            'color:var(--text3);' +
+                            'font-size:13px;' +
+                            'text-align:center;' +
+                            'padding:20px 0;">' +
+                            '尚無標記' +
+                            '</div>';
+
+                        return;
+                    }
+
+                    element.innerHTML =
+                        '';
+
+                    visible.forEach(
+                        function(s, vi) {
+
+                            var names = {
+                                pen: '畫筆',
+                                arrow: '箭頭',
+                                rect: '矩形',
+                                circle: '圓形',
+                                line: '直線',
+                                text: '文字'
+                            };
+
+                            var div =
+                                document.createElement(
+                                    'div'
+                                );
+
+                            div.className =
+                                'stroke-item';
+
+                            div.innerHTML =
+                                '<div class="stroke-item-head">' +
+
+                                '<span class="stroke-swatch" ' +
+                                'style="background:' +
+                                (s.color || '#333') +
+                                '"></span>' +
+
+                                '<span class="stroke-tool-tag">' +
+                                (names[s.tool] || s.tool) +
+                                '</span>' +
+
+                                '<span class="stroke-num">#' +
+                                (vi + 1) +
+                                '</span>' +
+
+                                '<button type="button" ' +
+                                'class="stroke-del" ' +
+                                'onclick="delStroke_' +
+                                IDX +
+                                '(' +
+                                vi +
+                                ')">✕</button>' +
+
+                                '</div>' +
+
+                                '<textarea ' +
+                                'class="stroke-comment-input" ' +
+                                'placeholder="尚無說明，點此輸入…" ' +
+                                'oninput="updComment_' +
+                                IDX +
+                                '(' +
+                                vi +
+                                ',this.value)">' +
+
+                                escapeHtml(
+                                    s.comment || ''
+                                ) +
+
+                                '</textarea>';
+
+                            element.appendChild(
+                                div
+                            );
+                        }
+                    );
+                }
+
+
+                canvas.addEventListener(
+                    'mousedown',
+                    function(e) {
+
+                        if (!CAN_EDIT) {
+                            return;
+                        }
+
+                        e.preventDefault();
+
+                        if (
+                            pendingStrokeIdx >= 0
+                        ) {
+                            return;
+                        }
+
+                        var pos =
+                            getPos(e);
+
+                        startX =
+                            pos[0];
+
+                        startY =
+                            pos[1];
+
+                        isDrawing =
+                            true;
+
+
+                        if (curTool === 'text') {
+                            isDrawing =
+                                false;
+
+                            var text =
+                                prompt(
+                                    '請輸入文字標記：'
+                                );
+
+                            if (!text) {
+                                return;
+                            }
+
+                            strokes.push(
+                                makeStroke(
+                                    'text',
+                                    [[startX, startY]],
+                                    text
+                                )
+                            );
+
+                            redraw();
+                            renderOverlays();
+
+                            pendingStrokeIdx =
+                                strokes.length - 1;
+
+                            showBubble(
+                                startX,
+                                startY
+                            );
+
+                            return;
+                        }
+
+
+                        if (
+                            curTool === 'rect' ||
+                            curTool === 'circle' ||
+                            curTool === 'arrow' ||
+                            curTool === 'line'
+                        ) {
+                            snapData =
+                                ctx.getImageData(
+                                    0,
+                                    0,
+                                    canvas.width,
+                                    canvas.height
+                                );
+                        }
+                    }
+                );
+
+
+                canvas.addEventListener(
+                    'mousemove',
+                    function(e) {
+
+                        if (!CAN_EDIT ||
+                            !isDrawing) {
+                            return;
+                        }
+
+                        e.preventDefault();
+
+                        var pos =
+                            getPos(e);
+
+
+                        if (
+                            curTool === 'pen' ||
+                            curTool === 'eraser'
+                        ) {
+                            if (
+                                !strokes.length ||
+                                !strokes[
+                                    strokes.length - 1
+                                ]._live
+                            ) {
+                                strokes.push(
+                                    makeStroke(
+                                        curTool,
+                                        [[startX, startY]]
+                                    )
+                                );
+
+                                strokes[
+                                    strokes.length - 1
+                                ]._live =
+                                    true;
+                            }
+
+                            strokes[
+                                strokes.length - 1
+                            ].points.push(
+                                [pos[0], pos[1]]
+                            );
+
+                            redraw();
+                        }
+                        else {
+                            if (snapData) {
+                                ctx.putImageData(
+                                    snapData,
+                                    0,
+                                    0
+                                );
+                            }
+
+                            paintStroke(
+                                ctx,
+                                makeStroke(
+                                    curTool,
+                                    [
+                                        [startX, startY],
+                                        [pos[0], pos[1]]
+                                    ]
+                                )
+                            );
+                        }
+                    }
+                );
+
+
+                canvas.addEventListener(
+                    'mouseup',
+                    function(e) {
+
+                        if (!CAN_EDIT ||
+                            !isDrawing) {
+                            isDrawing =
+                                false;
+
+                            return;
+                        }
+
+                        isDrawing =
+                            false;
+
+                        var pos =
+                            getPos(e);
+
+
+                        if (
+                            curTool === 'pen' ||
+                            curTool === 'eraser'
+                        ) {
+                            if (strokes.length) {
+                                delete strokes[
+                                    strokes.length - 1
+                                ]._live;
+                            }
+
+                            redraw();
+                            renderOverlays();
+
+                            if (
+                                curTool ===
+                                'eraser'
+                            ) {
+                                renderList();
+                                return;
+                            }
+
+                            pendingStrokeIdx =
+                                strokes.length - 1;
+
+                            var anchor =
+                                strokes[
+                                    pendingStrokeIdx
+                                ].points[0];
+
+                            showBubble(
+                                anchor[0],
+                                anchor[1]
+                            );
+                        }
+                        else {
+                            snapData =
+                                null;
+
+                            strokes.push(
+                                makeStroke(
+                                    curTool,
+                                    [
+                                        [startX, startY],
+                                        [pos[0], pos[1]]
+                                    ]
+                                )
+                            );
+
+                            redraw();
+                            renderOverlays();
+
+                            pendingStrokeIdx =
+                                strokes.length - 1;
+
+                            showBubble(
+                                pos[0],
+                                pos[1]
+                            );
+                        }
+                    }
+                );
+
+
+                window[
+                    'setTool_' + IDX
+                ] =
+                    function(tool) {
+
+                        curTool =
+                            tool;
+
+                        [
+                            'pen',
+                            'arrow',
+                            'rect',
+                            'circle',
+                            'line',
+                            'text',
+                            'eraser'
+                        ].forEach(
+                            function(name) {
+
+                                var button =
+                                    document.getElementById(
+                                        'tb_' +
+                                        name +
+                                        '_' +
+                                        IDX
+                                    );
+
+                                if (button) {
+                                    button.classList.toggle(
+                                        'active-tool',
+                                        name === tool
+                                    );
+                                }
+                            }
+                        );
+                    };
+
+
+                window[
+                    'undoStroke_' + IDX
+                ] =
+                    function() {
+
+                        hideBubble();
+
+                        pendingStrokeIdx =
+                            -1;
+
+                        if (strokes.length) {
+                            strokes.pop();
+
+                            redraw();
+                            renderOverlays();
+                            renderList();
+                        }
+                    };
+
+
+                window[
+                    'clearAllStrokes_' + IDX
+                ] =
+                    function() {
+
+                        if (!confirm(
+                            '確定清除所有標記？'
+                        )) {
+                            return;
+                        }
+
+                        strokes =
+                            [];
+
+                        redraw();
+                        renderOverlays();
+                        renderList();
+                    };
+
+
+                window[
+                    'bubbleConfirm_' + IDX
+                ] =
+                    function() {
+
+                        if (
+                            pendingStrokeIdx >= 0 &&
+                            pendingStrokeIdx <
+                            strokes.length
+                        ) {
+                            strokes[
+                                pendingStrokeIdx
+                            ].comment =
+                                bubbleTx
+                                    ? bubbleTx.value.trim()
+                                    : '';
+                        }
+
+                        pendingStrokeIdx =
+                            -1;
+
+                        hideBubble();
+
+                        renderList();
+                        renderOverlays();
+                    };
+
+
+                window[
+                    'bubbleSkip_' + IDX
+                ] =
+                    function() {
+
+                        pendingStrokeIdx =
+                            -1;
+
+                        hideBubble();
+
+                        renderList();
+                        renderOverlays();
+                    };
+
+
+                window[
+                    'delStroke_' + IDX
+                ] =
+                    function(visibleIndex) {
+
+                        var visible =
+                            strokes.filter(
+                                function(s) {
+                                    return s.tool !==
+                                        'eraser';
+                                }
+                            );
+
+                        var target =
+                            visible[
+                            visibleIndex
+                            ];
+
+                        strokes =
+                            strokes.filter(
+                                function(s) {
+                                    return s !==
+                                        target;
+                                }
+                            );
+
+                        redraw();
+                        renderOverlays();
+                        renderList();
+                    };
+
+
+                window[
+                    'updComment_' + IDX
+                ] =
+                    function(
+                        visibleIndex,
+                        value
+                    ) {
+                        var visible =
+                            strokes.filter(
+                                function(s) {
+                                    return s.tool !==
+                                        'eraser';
+                                }
+                            );
+
+                        if (
+                            visible[
+                            visibleIndex
+                            ]
+                        ) {
+                            visible[
+                                visibleIndex
+                            ].comment =
+                                value;
+                        }
+                    };
+
+
+                window[
+                    'getStrokes_' + IDX
+                ] =
+                    function() {
+                        return strokes;
+                    };
+
+
+                window[
+                    'getCanvas_' + IDX
+                ] =
+                    function() {
+                        return canvas;
+                    };
+
+
+                window[
+                    'getImg_' + IDX
+                ] =
+                    function() {
+                        return imgEl;
+                    };
+
+
+                if (
+                    imgEl.complete &&
+                    imgEl.naturalWidth > 0
+                ) {
+                    tryResize();
+                    redraw();
+                    renderList();
+                }
+                else {
+                    imgEl.addEventListener(
+                        'load',
+                        function() {
+                            tryResize();
+                            redraw();
+                            renderList();
+                        }
+                    );
+                }
+
+
+                window.addEventListener(
+                    'resize',
+                    resize
+                );
+            }
+            function setTool(i, t) { if (window['setTool_' + i]) window['setTool_' + i](t); }
+            function undoStroke(i) { if (window['undoStroke_' + i]) window['undoStroke_' + i](); }
+            function clearAllStrokes(i) { if (window['clearAllStrokes_' + i]) window['clearAllStrokes_' + i](); }
+            function bubbleConfirm(i) { if (window['bubbleConfirm_' + i]) window['bubbleConfirm_' + i](); }
+            function bubbleSkip(i) { if (window['bubbleSkip_' + i]) window['bubbleSkip_' + i](); }
+
+            /* ── 儲存：筆畫 JSON + 合成圖 ── */
+            async function saveDrawing(row, imageId, imageType, i) {
+                var btn = document.getElementById('savebtn_' + i);
+                var strokes = window['getStrokes_' + i] ? window['getStrokes_' + i]() : [];
+                var canvas = window['getCanvas_' + i] ? window['getCanvas_' + i]() : null;
+                var imgEl = window['getImg_' + i] ? window['getImg_' + i]() : null;
+
+                // 合成圖（底圖 + 筆畫）
+                var base64 = '';
+                if (canvas && imgEl) {
+                    var tmp = document.createElement('canvas');
+                    tmp.width = canvas.width;
+                    tmp.height = canvas.height;
+                    var tc = tmp.getContext('2d');
+                    tc.drawImage(imgEl, 0, 0, tmp.width, tmp.height);
+                    tc.drawImage(canvas, 0, 0);
+                    base64 = tmp.toDataURL('image/png');
+                }
+
+                // 去除 _live flag
+                var clean = strokes.map(function(s) { var c = Object.assign({}, s); delete c._live; return c; });
+
+                if (btn) { btn.textContent = '儲存中…'; btn.disabled = true; }
+                try {
+                    var resp = await fetch('/Home/SaveDrawing', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body:
+                            'row=' +
+                            encodeURIComponent(row) +
+
+                            '&imageId=' +
+                            encodeURIComponent(imageId) +
+
+                            '&imageType=' +
+                            encodeURIComponent(imageType) +
+
+                            '&drawingJson=' +
+                            encodeURIComponent(
+                                JSON.stringify(clean)
+                            ) +
+
+                            '&annotatedImageBase64=' +
+                            encodeURIComponent(base64)
+                    });
+                    if (resp.ok) {
+                        if (btn) { btn.textContent = '✔ 已儲存'; btn.style.color = '#5cb88a'; btn.style.borderColor = 'var(--success)'; }
+                        setTimeout(function() {
+                            if (btn) { btn.textContent = '💾 儲存標記'; btn.style.color = ''; btn.style.borderColor = ''; btn.disabled = false; }
+                        }, 2200);
+                    } else {
+                        if (btn) { btn.textContent = '❌ 失敗'; btn.disabled = false; }
+                    }
+                } catch (e) {
+                    if (btn) { btn.textContent = '❌ 網路錯誤'; btn.disabled = false; }
+                }
+            }
+
+            /* ── 圖片切換 ── */
+            var currentIndex = 0;
+            function showImage(idx) {
+                var blocks = document.querySelectorAll('.img-block');
+                if (!blocks.length) return;
+                if (idx < 0) idx = 0;
+                if (idx >= blocks.length) idx = blocks.length - 1;
+                currentIndex = idx;
+                blocks.forEach(function(el, i) { el.classList.toggle('active', i === idx); });
+            }
+            function nextImage() { showImage(currentIndex + 1); }
+            function prevImage() { showImage(currentIndex - 1); }
+            document.addEventListener('DOMContentLoaded', function() { showImage(0); });
+
+            /* ── 刪除圖片 / 影片 ── */
+            async function deleteImage(
+                rowKey,
+                imgPath,
+                imageType
+            ) {
+                if (!confirm(
+                    '確定要刪除這張影像嗎？'
+                )) {
+                    return;
+                }
+
+                try {
+                    const res =
+                        await fetch(
+                            '/Home/DeleteImage',
+                            {
+                                method: 'POST',
+
+                                headers: {
+                                    'Content-Type':
+                                        'application/json'
+                                },
+
+                                body: JSON.stringify({
+                                    rowKey: rowKey,
+                                    imgPath: imgPath,
+                                    imageType: imageType
+                                })
+                            }
+                        );
+
+                    if (res.ok) {
+                        alert(
+                            '圖片刪除成功'
+                        );
+
+                        location.reload();
+
+                        return;
+                    }
+
+                    const message =
+                        await res.text();
+
+                    alert(
+                        '圖片刪除失敗：\n' +
+                        message
+                    );
+                }
+                catch (error) {
+                    alert(
+                        '圖片刪除失敗：網路或伺服器錯誤'
+                    );
+                }
+            }
+            function deleteVideo(rowKey, videoPath) {
+                if (!confirm('確定刪除這部影片？')) return;
+                fetch('/Home/DeleteVideo', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rowKey: rowKey, videoPath: videoPath })
+                }).then(async function(res) {
+                    var msg = await res.text();
+                    if (res.ok) { alert('影片刪除成功'); location.reload(); }
+                    else alert('影片刪除失敗：\n' + msg);
+                });
+            }
+    </script>
+</body>
+</html>

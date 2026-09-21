@@ -1,0 +1,150 @@
+﻿@using Microsoft.AspNetCore.Http
+@model List<HBaseMVC.Controllers.QuizAttemptRecord>
+
+@{
+    Layout = null;
+    ViewBag.Title = "測驗歷史紀錄 — 病理教學系統";
+    string studentId = Context.Session.GetString("LoginId") ?? "";
+}
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewBag.Title</title>
+    <style>
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                background: #f4f6f9;
+                color: #2c3e50;
+                font-family: "Microsoft JhengHei",sans-serif;
+            }
+
+            .topbar {
+                height: 68px;
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                padding: 0 32px;
+                background: #fff;
+                border-bottom: 1px solid #dcdfe6;
+            }
+
+            .brand {
+                font-size: 28px;
+                font-weight: 700;
+            }
+
+            .spacer {
+                flex: 1;
+            }
+
+            .btn {
+                min-height: 38px;
+                padding: 0 16px;
+                border: 1px solid #cfd6e0;
+                border-radius: 8px;
+                background: #fff;
+                color: #2c3e50;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+            }
+
+            .container {
+                max-width: 1000px;
+                margin: 0 auto;
+                padding: 34px 24px 70px;
+            }
+
+            .title {
+                font-size: 28px;
+                font-weight: 700;
+                margin-bottom: 6px;
+            }
+
+            .sub {
+                color: #7a8492;
+                margin-bottom: 24px;
+            }
+
+            .card {
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 14px;
+                display: flex;
+                align-items: center;
+                gap: 18px;
+            }
+
+            .main {
+                flex: 1;
+            }
+
+            .score {
+                font-size: 22px;
+                font-weight: 700;
+                color: #2563eb;
+            }
+
+            .meta {
+                color: #7a8492;
+                margin-top: 6px;
+                font-size: 13px;
+            }
+
+            .empty {
+                background: #fff;
+                border: 1px solid #dcdfe6;
+                border-radius: 12px;
+                padding: 50px;
+                text-align: center;
+                color: #7a8492;
+            }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">病理教學系統</div>
+        <span>測驗歷史紀錄</span>
+        <div class="spacer"></div>
+        <span style="color:#7a8492;">學生：@studentId</span>
+        <a class="btn" href="@Url.Action("Quiz", "Home")">返回測驗</a>
+        <a class="btn" href="@Url.Action("Index", "Home")">返回首頁</a>
+    </header>
+
+    <main class="container">
+        <div class="title">歷史作答紀錄</div>
+        <div class="sub">可查看每次測驗的分數、作答內容與正確答案。</div>
+
+        @if (Model == null || Model.Count == 0)
+        {
+            <div class="empty">目前尚無測驗作答紀錄。</div>
+        }
+        else
+        {
+            @foreach (var attempt in Model)
+            {
+                <div class="card">
+                    <div class="main">
+                        <div class="score">@attempt.Score / @attempt.Total</div>
+                        <div class="meta">作答時間：@attempt.SubmittedAt</div>
+                        <div class="meta">紀錄編號：@attempt.AttemptId</div>
+                    </div>
+                    <a class="btn"
+                       href="@Url.Action("QuizAttemptDetail", "Home", new { attemptId = attempt.AttemptId })">
+                        查看作答與正確答案
+                    </a>
+                </div>
+            }
+        }
+    </main>
+</body>
+</html>
