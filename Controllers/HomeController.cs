@@ -21,7 +21,28 @@ namespace HBaseMVC.Controllers
 
         public string MedicalRecordNumber { get; set; } = "";
     }
+    public sealed class BodyMarkPoint
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
+    }
 
+    public sealed class BodyAnnotationMark
+    {
+        public string Type { get; set; } = "";
+
+        public double X { get; set; }
+        public double Y { get; set; }
+
+        public List<BodyMarkPoint> Points { get; set; } = new();
+    }
+
+    public sealed class SaveBodyAnnotationRequest
+    {
+        public string Row { get; set; } = "";
+
+        public List<BodyAnnotationMark> Marks { get; set; } = new();
+    }
 
     public sealed class QuizQuestion
     {
@@ -2331,6 +2352,13 @@ namespace HBaseMVC.Controllers
 
             HttpContext.Session.SetString("Role", user.Role);
             HttpContext.Session.SetString("LoginId", user.LoginId);
+
+            if (user.Role == "Admin")
+            {
+                return RedirectToAction(
+                    "SurgicalTableManagement"
+                );
+            }
 
             return RedirectToAction("Index");
         }
@@ -5701,17 +5729,6 @@ namespace HBaseMVC.Controllers
 
             if (block != null)
                 return block;
-
-            // 管理員首頁預設改為手術台資料。
-            // 若明確指定 row / panel，仍可使用 Index 其他管理功能。
-            if (IsAdmin() &&
-                string.IsNullOrWhiteSpace(row) &&
-                string.IsNullOrWhiteSpace(panel))
-            {
-                return RedirectToAction(
-                    "SurgicalTableManagement"
-                );
-            }
 
             var data = await GetAllData();
             Cadaver? currentPatient =
@@ -14258,7 +14275,330 @@ namespace HBaseMVC.Controllers
 
             return content.Trim();
         }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveBodyAnnotation(
+    [FromBody] SaveBodyAnnotationRequest request)
+        {
+            var block = RequireAdmin();
 
+            if (block != null)
+                return block;
+
+
+            if (request == null)
+            {
+                return BadRequest(
+                    new
+                    {
+                        success = false,
+                        message = "資料不可為空"
+                    }
+                );
+            }
+
+
+            string row =
+                request.Row?.Trim() ?? "";
+
+
+            if (string.IsNullOrWhiteSpace(row))
+            {
+                return BadRequest(
+                    new
+                    {
+                        success = false,
+                        message = "缺少大體老師編號"
+                    }
+                );
+            }
+
+
+            request.Marks ??=
+                new List<BodyAnnotationMark>();
+
+
+            try
+            {
+                // ----------------------------------------------------
+                // JSON
+                // ----------------------------------------------------
+                string json =
+                    JsonSerializer.Serialize(
+                        request.Marks
+                    );
+
+
+                string loginId =
+                    HttpContext.Session.GetString(
+                        "LoginId"
+                    )
+                    ?? "";
+
+
+                string updatedAt =
+                    DateTime.Now.ToString(
+                        "yyyy-MM-dd HH:mm:ss"
+                    );
+
+
+                // ----------------------------------------------------
+                // 寫入 HBase
+                // teaching:body_annotation
+                // ----------------------------------------------------
+                string xml =
+                    $@"
+<CellSet>
+    <Row key=""{ToBase64(row)}"">
+
+        <Cell column=""{ToBase64("teaching:body_annotation")}"">
+            {ToBase64(json)}
+        </Cell>
+
+        <Cell column=""{ToBase64("teaching:body_annotation_updated_by")}"">
+            {ToBase64(loginId)}
+        </Cell>
+
+        <Cell column=""{ToBase64("teaching:body_annotation_updated_at")}"">
+            {ToBase64(updatedAt)}
+        </Cell>
+
+    </Row>
+</CellSet>";
+
+
+                using var content =
+                    new StringContent(
+                        xml,
+                        Encoding.UTF8,
+                        "text/xml"
+                    );
+
+
+                string encodedRow =
+                    Uri.EscapeDataString(row);
+
+
+                HttpResponseMessage response =
+                    await _client.PutAsync(
+                        $"cadaver/{encodedRow}",
+                        content
+                    );
+
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    string error =
+                        await response.Content
+                            .ReadAsStringAsync();
+
+
+                    _logger.LogError(
+                        "儲存人體標記失敗。Row={Row}, Status={Status}, Error={Error}",
+                        row,
+                        response.StatusCode,
+                        error
+                    );
+
+
+                    return StatusCode(
+                        (int)response.StatusCode,
+                        new
+                        {
+                            success = false,
+                            message = "HBase 儲存失敗"
+                        }
+                    );
+                }
+
+
+                return Ok(
+                    new
+                    {
+                        success = true,
+                        row,
+                        updatedBy = loginId,
+                        updatedAt
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "儲存人體標記發生錯誤。Row={Row}",
+                    row
+                );
+
+
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    new
+                    {
+                        success = false,
+                        message = "儲存人體標記發生錯誤"
+                    }
+                );
+            }
+        }
+        [HttpGet]
+        public async Task<IActionResult> GetBodyAnnotation(
+    string row)
+        {
+            var block = RequireLogin();
+
+            if (block != null)
+                return block;
+
+
+            row =
+                row?.Trim() ?? "";
+
+
+            if (string.IsNullOrWhiteSpace(row))
+            {
+                return BadRequest(
+                    new
+                    {
+                        success = false,
+                        message = "缺少大體老師編號"
+                    }
+                );
+            }
+
+
+            try
+            {
+                string encodedRow =
+                    Uri.EscapeDataString(row);
+
+                string encodedColumn =
+                    Uri.EscapeDataString(
+                        "teaching:body_annotation"
+                    );
+
+
+                // ----------------------------------------------------
+                // HBase REST：
+                // cadaver/{row}/{column}
+                // ----------------------------------------------------
+                var request =
+                    new HttpRequestMessage(
+                        HttpMethod.Get,
+                        $"cadaver/{encodedRow}/{encodedColumn}"
+                    );
+
+
+                request.Headers.Add(
+                    "Accept",
+                    "text/xml"
+                );
+
+
+                HttpResponseMessage response =
+                    await _client.SendAsync(
+                        request
+                    );
+
+
+                // 尚未標記過
+                if (
+                    response.StatusCode ==
+                    System.Net.HttpStatusCode.NotFound
+                )
+                {
+                    return Ok(
+                        new
+                        {
+                            success = true,
+                            marks =
+                                Array.Empty<BodyAnnotationMark>()
+                        }
+                    );
+                }
+
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return StatusCode(
+                        (int)response.StatusCode,
+                        new
+                        {
+                            success = false,
+                            message = "讀取人體標記失敗"
+                        }
+                    );
+                }
+
+
+                string xml =
+                    await response.Content
+                        .ReadAsStringAsync();
+
+
+                byte[]? bytes =
+                    ExtractHBaseCellBytes(
+                        xml
+                    );
+
+
+                if (
+                    bytes == null ||
+                    bytes.Length == 0
+                )
+                {
+                    return Ok(
+                        new
+                        {
+                            success = true,
+                            marks =
+                                Array.Empty<BodyAnnotationMark>()
+                        }
+                    );
+                }
+
+
+                string json =
+                    Encoding.UTF8.GetString(
+                        bytes
+                    );
+
+
+                List<BodyAnnotationMark> marks =
+                    JsonSerializer.Deserialize<
+                        List<BodyAnnotationMark>
+                    >(json)
+                    ??
+                    new List<BodyAnnotationMark>();
+
+
+                return Ok(
+                    new
+                    {
+                        success = true,
+                        marks
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "讀取人體標記發生錯誤。Row={Row}",
+                    row
+                );
+
+
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    new
+                    {
+                        success = false,
+                        message = "讀取人體標記發生錯誤"
+                    }
+                );
+            }
+        }
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RecognizePaperMedicalRecord(

@@ -782,7 +782,35 @@
                 </svg>
                 手術台資料
             </a>
+            <a class="nav-item"
+   href="@Url.Action(
+       "Index",
+       "Home",
+       new { panel = "body-mark" }
+   )"
+   style="text-decoration:none;">
 
+    <svg class="nav-icon"
+         fill="none"
+         stroke="currentColor"
+         stroke-width="1.5"
+         viewBox="0 0 24 24">
+
+        <circle cx="12"
+                cy="5"
+                r="2.5">
+        </circle>
+
+        <path stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 8v5
+                 M8 10l4 3 4-3
+                 M10 13l-1 8
+                 M14 13l1 8" />
+    </svg>
+
+    解剖部位標記
+</a>
             @if (isAdmin)
             {
                 <a class="nav-item"

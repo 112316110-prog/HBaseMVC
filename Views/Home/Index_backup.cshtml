@@ -1790,6 +1790,30 @@
                 </svg>
                 搜尋影像
             </div>
+            <div class="nav-item"
+     onclick="showPanel('panel-body-mark', this)">
+
+    <svg class="nav-icon"
+         fill="none"
+         stroke="currentColor"
+         stroke-width="1.5"
+         viewBox="0 0 24 24">
+
+        <circle cx="12"
+                cy="5"
+                r="2.5">
+        </circle>
+
+        <path stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 8v5
+                 M8 10l4 3 4-3
+                 M10 13l-1 8
+                 M14 13l1 8" />
+    </svg>
+
+    解剖部位標記
+</div>
             <a class="nav-item"
                href="@Url.Action("MedicalRecordManagement", "Home")"
                style="text-decoration:none;">
@@ -2377,7 +2401,155 @@
                     }
                 </div>
             </section>
+            <!-- ────────────── PANEL: 解剖部位標記 ────────────── -->
+<section class="panel" id="panel-body-mark">
 
+    <div class="panel-header">
+        <span class="panel-title">
+            解剖部位標記
+        </span>
+
+        <span class="panel-sub">
+            標示不可解剖部位
+        </span>
+    </div>
+
+    <div class="card">
+
+        <!-- 選擇大體老師 -->
+        <div style="margin-bottom:20px;">
+
+            <label style="
+                display:block;
+                margin-bottom:8px;
+                font-size:13px;
+                color:var(--text2);">
+                選擇大體老師
+            </label>
+
+            <select id="body-patient-select"
+                    onchange="loadBodyAnnotation()"
+                    style="
+                        width:320px;
+                        height:40px;
+                        padding:0 12px;
+                        border:1px solid var(--border2);
+                        border-radius:9px;
+                        background:white;
+                        color:var(--text);">
+
+                <option value="">
+                    請選擇大體老師
+                </option>
+
+                @foreach (var item in Model)
+                {
+                    <option value="@item.RowKey">
+                        @item.RowKey
+                    </option>
+                }
+
+            </select>
+
+        </div>
+
+
+        <!-- 人體圖區 -->
+        <div id="body-editor-area"
+             style="display:none;">
+
+            <div style="
+                display:flex;
+                justify-content:center;
+                padding:20px 0;">
+
+                <div id="body-canvas-wrapper"
+                     style="
+                        position:relative;
+                        width:400px;">
+
+                    <img id="body-template-image"
+                         src="/images/body-template.png"
+                         alt="人體圖"
+                         style="
+                            display:block;
+                            width:400px;
+                            height:auto;
+                            user-select:none;" />
+
+<canvas id="body-mark-canvas"
+        style="
+            position:absolute;
+            left:0;
+            top:0;
+            z-index:10;">
+</canvas>
+
+                </div>
+
+            </div>
+
+
+            <!-- 只有管理員可以修改 -->
+            @if (isAdmin)
+            {
+                <div style="
+                    display:flex;
+                    justify-content:center;
+                    flex-wrap:wrap;
+                    gap:8px;
+                    margin-top:15px;">
+
+                    <button type="button"
+                            class="btn btn-danger"
+                            onclick="setBodyTool('x')">
+                        ✕ 不可解剖
+                    </button>
+
+                    <button type="button"
+                            class="btn"
+                            onclick="setBodyTool('draw')">
+                        ✏ 畫筆
+                    </button>
+
+                    <button type="button"
+                            class="btn"
+                            onclick="clearBodyMarks()">
+                        清除
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-success"
+                            onclick="saveBodyAnnotation()">
+                        儲存標記
+                    </button>
+
+                </div>
+            }
+
+
+            <div style="
+                margin-top:15px;
+                text-align:center;
+                color:var(--text2);
+                font-size:13px;">
+
+                <span style="
+                    color:#dc2626;
+                    font-size:18px;
+                    font-weight:600;">
+                    ✕
+                </span>
+
+                表示不可解剖部位
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
             <!-- ────────────── PANEL: 搜尋 ────────────── -->
             <section class="panel" id="panel-search">
                 <div class="panel-header">
@@ -3963,14 +4135,17 @@
                                 showAddPage(1);
                             }
 
-                            const titleMap = {
-                                'panel-list': '資料列表',
-                                'panel-search': '搜尋資料',
-                                'panel-add': '新增大體老師資料',
-                                'panel-ai': 'AI 助教',
-                                'panel-image': '病理影像',
-                                'panel-upload': '上傳影像'
-                            };
+const titleMap = {
+    'panel-list': '資料列表',
+    'panel-search': '搜尋資料',
+
+    'panel-body-mark': '解剖部位標記',
+
+    'panel-add': '新增大體老師資料',
+    'panel-ai': 'AI 助教',
+    'panel-image': '病理影像',
+    'panel-upload': '上傳影像'
+};
 
                             const titleElement =
                                 document.getElementById(
@@ -3985,7 +4160,633 @@
 
                             closeSidebar();
                         }
+                        // ============================================================
+// 人體解剖標記
+// ============================================================
 
+const BODY_IS_ADMIN =
+    @(isAdmin ? "true" : "false");
+
+const bodyCanvas =
+    document.getElementById(
+        'body-mark-canvas'
+    );
+    function syncBodyCanvasSize() {
+
+    const image =
+        document.getElementById(
+            'body-template-image'
+        );
+
+    if (!bodyCanvas || !image)
+        return;
+
+    const width =
+        image.clientWidth;
+
+    const height =
+        image.clientHeight;
+
+    if (!width || !height)
+        return;
+
+    bodyCanvas.width =
+        width;
+
+    bodyCanvas.height =
+        height;
+
+    bodyCanvas.style.width =
+        width + 'px';
+
+    bodyCanvas.style.height =
+        height + 'px';
+
+    redrawBodyMarks();
+}
+document.addEventListener(
+    'DOMContentLoaded',
+    function() {
+
+        const image =
+            document.getElementById(
+                'body-template-image'
+            );
+
+        if (!image)
+            return;
+
+        image.addEventListener(
+            'load',
+            syncBodyCanvasSize
+        );
+
+        if (image.complete) {
+            syncBodyCanvasSize();
+        }
+
+        window.addEventListener(
+            'resize',
+            syncBodyCanvasSize
+        );
+    }
+);
+const bodyCtx =
+    bodyCanvas
+        ? bodyCanvas.getContext('2d')
+        : null;
+
+let bodyTool = 'x';
+let bodyMarks = [];
+let bodyDrawing = false;
+
+
+// ------------------------------------------------------------
+// 切換工具
+// ------------------------------------------------------------
+function setBodyTool(tool) {
+
+    bodyTool = tool;
+
+    if (!bodyCanvas)
+        return;
+
+    if (tool === 'draw') {
+        bodyCanvas.style.cursor = 'crosshair';
+    }
+    else if (tool === 'x') {
+        bodyCanvas.style.cursor = 'crosshair';
+    }
+}
+
+
+// ------------------------------------------------------------
+// 取得滑鼠在 Canvas 的真正座標
+// ------------------------------------------------------------
+function getBodyCanvasPoint(e) {
+
+    const rect =
+        bodyCanvas.getBoundingClientRect();
+
+    return {
+        x:
+            (e.clientX - rect.left) *
+            bodyCanvas.width /
+            rect.width,
+
+        y:
+            (e.clientY - rect.top) *
+            bodyCanvas.height /
+            rect.height
+    };
+}
+
+
+// ------------------------------------------------------------
+// 畫 X
+// ------------------------------------------------------------
+function drawBodyX(x, y) {
+
+    if (!bodyCtx)
+        return;
+
+    const size = 14;
+
+    bodyCtx.beginPath();
+
+    bodyCtx.moveTo(
+        x - size,
+        y - size
+    );
+
+    bodyCtx.lineTo(
+        x + size,
+        y + size
+    );
+
+    bodyCtx.moveTo(
+        x + size,
+        y - size
+    );
+
+    bodyCtx.lineTo(
+        x - size,
+        y + size
+    );
+
+    bodyCtx.strokeStyle =
+        '#dc2626';
+
+    bodyCtx.lineWidth = 4;
+
+    bodyCtx.lineCap =
+        'round';
+
+    bodyCtx.stroke();
+}
+
+
+// ------------------------------------------------------------
+// 點一下產生 X
+// ------------------------------------------------------------
+if (bodyCanvas) {
+
+    bodyCanvas.addEventListener(
+        'click',
+        function(e) {
+
+            if (!BODY_IS_ADMIN)
+                return;
+
+            if (bodyTool !== 'x')
+                return;
+
+            const p =
+                getBodyCanvasPoint(e);
+
+            drawBodyX(
+                p.x,
+                p.y
+            );
+
+            bodyMarks.push({
+                type: 'x',
+
+                x:
+                    p.x /
+                    bodyCanvas.width,
+
+                y:
+                    p.y /
+                    bodyCanvas.height
+            });
+        }
+    );
+}
+
+
+// ------------------------------------------------------------
+// 自由畫筆：開始
+// ------------------------------------------------------------
+if (bodyCanvas) {
+
+    bodyCanvas.addEventListener(
+        'mousedown',
+        function(e) {
+
+            if (!BODY_IS_ADMIN)
+                return;
+
+            if (bodyTool !== 'draw')
+                return;
+
+            bodyDrawing = true;
+
+            const p =
+                getBodyCanvasPoint(e);
+
+            bodyCtx.beginPath();
+
+            bodyCtx.moveTo(
+                p.x,
+                p.y
+            );
+
+            bodyMarks.push({
+                type: 'stroke',
+
+                points: [
+                    {
+                        x:
+                            p.x /
+                            bodyCanvas.width,
+
+                        y:
+                            p.y /
+                            bodyCanvas.height
+                    }
+                ]
+            });
+        }
+    );
+
+
+    // --------------------------------------------------------
+    // 自由畫筆：移動
+    // --------------------------------------------------------
+    bodyCanvas.addEventListener(
+        'mousemove',
+        function(e) {
+
+            if (!bodyDrawing)
+                return;
+
+            if (bodyTool !== 'draw')
+                return;
+
+            const p =
+                getBodyCanvasPoint(e);
+
+            bodyCtx.lineTo(
+                p.x,
+                p.y
+            );
+
+            bodyCtx.strokeStyle =
+                '#dc2626';
+
+            bodyCtx.lineWidth = 4;
+
+            bodyCtx.lineCap =
+                'round';
+
+            bodyCtx.lineJoin =
+                'round';
+
+            bodyCtx.stroke();
+
+
+            const stroke =
+                bodyMarks[
+                    bodyMarks.length - 1
+                ];
+
+            if (
+                stroke &&
+                stroke.type === 'stroke'
+            ) {
+                stroke.points.push({
+                    x:
+                        p.x /
+                        bodyCanvas.width,
+
+                    y:
+                        p.y /
+                        bodyCanvas.height
+                });
+            }
+        }
+    );
+
+
+    bodyCanvas.addEventListener(
+        'mouseup',
+        function() {
+
+            bodyDrawing = false;
+        }
+    );
+
+
+    bodyCanvas.addEventListener(
+        'mouseleave',
+        function() {
+
+            bodyDrawing = false;
+        }
+    );
+}
+
+
+// ------------------------------------------------------------
+// 清除全部
+// ------------------------------------------------------------
+function clearBodyMarks() {
+
+    if (!BODY_IS_ADMIN)
+        return;
+
+    if (!bodyCanvas ||
+        !bodyCtx)
+        return;
+
+    bodyMarks = [];
+
+    bodyCtx.clearRect(
+        0,
+        0,
+        bodyCanvas.width,
+        bodyCanvas.height
+    );
+}
+
+
+// ------------------------------------------------------------
+// 重新畫出所有標記
+// ------------------------------------------------------------
+function redrawBodyMarks() {
+
+    if (!bodyCanvas ||
+        !bodyCtx)
+        return;
+
+    bodyCtx.clearRect(
+        0,
+        0,
+        bodyCanvas.width,
+        bodyCanvas.height
+    );
+
+
+    bodyMarks.forEach(
+        function(mark) {
+
+            // X 標記
+            if (
+                mark.type === 'x'
+            ) {
+
+                drawBodyX(
+                    mark.x *
+                    bodyCanvas.width,
+
+                    mark.y *
+                    bodyCanvas.height
+                );
+
+                return;
+            }
+
+
+            // 自由畫筆
+            if (
+                mark.type === 'stroke' &&
+                Array.isArray(
+                    mark.points
+                ) &&
+                mark.points.length > 0
+            ) {
+
+                bodyCtx.beginPath();
+
+                bodyCtx.moveTo(
+                    mark.points[0].x *
+                        bodyCanvas.width,
+
+                    mark.points[0].y *
+                        bodyCanvas.height
+                );
+
+
+                for (
+                    let i = 1;
+                    i <
+                    mark.points.length;
+                    i++
+                ) {
+
+                    bodyCtx.lineTo(
+                        mark.points[i].x *
+                            bodyCanvas.width,
+
+                        mark.points[i].y *
+                            bodyCanvas.height
+                    );
+                }
+
+
+                bodyCtx.strokeStyle =
+                    '#dc2626';
+
+                bodyCtx.lineWidth = 4;
+
+                bodyCtx.lineCap =
+                    'round';
+
+                bodyCtx.lineJoin =
+                    'round';
+
+                bodyCtx.stroke();
+            }
+        }
+    );
+}
+async function loadBodyAnnotation() {
+
+    const select =
+        document.getElementById(
+            'body-patient-select'
+        );
+
+    const area =
+        document.getElementById(
+            'body-editor-area'
+        );
+
+
+    if (!select || !area)
+        return;
+
+
+    const row =
+        select.value;
+
+
+    if (!row) {
+
+        area.style.display =
+            'none';
+
+        bodyMarks = [];
+
+        if (bodyCtx) {
+            bodyCtx.clearRect(
+                0,
+                0,
+                bodyCanvas.width,
+                bodyCanvas.height
+            );
+        }
+
+        return;
+    }
+
+
+area.style.display =
+    'block';
+
+requestAnimationFrame(
+    function() {
+
+        syncBodyCanvasSize();
+
+        requestAnimationFrame(
+            function() {
+                syncBodyCanvasSize();
+            }
+        );
+    }
+);
+
+    // 先清空上一個人的資料
+    bodyMarks = [];
+
+    if (bodyCtx) {
+
+        bodyCtx.clearRect(
+            0,
+            0,
+            bodyCanvas.width,
+            bodyCanvas.height
+        );
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                '/Home/GetBodyAnnotation?row=' +
+                encodeURIComponent(row)
+            );
+
+
+        if (!response.ok) {
+
+            console.error(
+                await response.text()
+            );
+
+            alert(
+                '讀取人體標記失敗'
+            );
+
+            return;
+        }
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            data &&
+            Array.isArray(data.marks)
+        ) {
+            bodyMarks =
+                data.marks;
+        }
+        else {
+            bodyMarks = [];
+        }
+
+
+        redrawBodyMarks();
+
+    }
+    catch (error) {
+
+        console.error(error);
+
+        alert(
+            '讀取人體標記時發生錯誤'
+        );
+    }
+}
+async function saveBodyAnnotation() {
+
+    if (!BODY_IS_ADMIN)
+        return;
+
+    const select =
+        document.getElementById(
+            'body-patient-select'
+        );
+
+    if (!select || !select.value) {
+        alert('請先選擇大體老師');
+        return;
+    }
+
+    const row =
+        select.value;
+
+    try {
+
+        const response =
+            await fetch(
+                '/Home/SaveBodyAnnotation',
+                {
+                    method: 'POST',
+
+                    headers: {
+                        'Content-Type':
+                            'application/json',
+
+                        'RequestVerificationToken':
+                            getAntiForgeryToken()
+                    },
+
+                    body:
+                        JSON.stringify({
+                            row: row,
+                            marks: bodyMarks
+                        })
+                }
+            );
+
+        if (!response.ok) {
+
+            const text =
+                await response.text();
+
+            console.error(text);
+
+            alert('儲存標記失敗');
+            return;
+        }
+
+        alert('標記已儲存');
+    }
+    catch (error) {
+
+        console.error(error);
+
+        alert(
+            '儲存標記時發生錯誤'
+        );
+    }
+}
                         /* ── Open upload panel for specific row ── */
                         function openUpload(row) {
                             document.querySelectorAll('.upload-card').forEach(c => c.style.display = 'none');
@@ -4010,13 +4811,14 @@
                             const requestedPanel =
                                 '@(ViewBag.OpenPanel?.ToString() ?? "")';
 
-                            const panelMap = {
-                                list: 'panel-list',
-                                add: 'panel-add',
-                                image: 'panel-image',
-                                upload: 'panel-upload',
-                                ai: 'panel-ai'
-                            };
+const panelMap = {
+    list: 'panel-list',
+    add: 'panel-add',
+    image: 'panel-image',
+    upload: 'panel-upload',
+    ai: 'panel-ai',
+    'body-mark': 'panel-body-mark'
+};
 
                             if (
                                 requestedPanel &&
