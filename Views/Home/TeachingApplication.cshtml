@@ -1,0 +1,749 @@
+﻿@model HBaseMVC.Models.TeachingApplication
+@using Microsoft.AspNetCore.Http
+
+@{
+    Layout = null;
+
+    ViewBag.Title =
+        "手術教學申請單";
+
+    string loginId =
+        Context.Session.GetString("LoginId")
+        ?? "";
+
+    string role =
+        Context.Session.GetString("Role")
+        ?? "";
+
+    bool canSubmit =
+        (bool)(ViewBag.CanSubmit ?? false);
+
+    var application =
+        Model
+        ?? new HBaseMVC.Models.TeachingApplication();
+
+    string applicantValue =
+        canSubmit
+            ? loginId
+            : application.Applicant;
+
+    string classTimeValue = "";
+
+    if (DateTime.TryParse(
+        application.ClassTime,
+        out DateTime parsedClassTime))
+    {
+        classTimeValue =
+            parsedClassTime.ToString(
+                "yyyy-MM-ddTHH:mm"
+            );
+    }
+
+    bool isViewingExisting =
+        !string.IsNullOrWhiteSpace(
+            application.RowKey
+        );
+
+    string statusClass =
+        application.Status == "Approved"
+            ? "approved"
+            : application.Status == "Rejected"
+                ? "rejected"
+                : "pending";
+
+    string statusText =
+        application.Status == "Approved"
+            ? "已核准"
+            : application.Status == "Rejected"
+                ? "已退回"
+                : "待審核";
+}
+
+<!DOCTYPE html>
+
+<html lang="zh-TW">
+
+<head>
+
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width,
+                   initial-scale=1.0" />
+
+    <title>
+        @ViewBag.Title
+    </title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 32px;
+            background: #f7f7f8;
+            color: #212121;
+            font-family:
+                "Noto Sans TC",
+                "Microsoft JhengHei",
+                Arial,
+                sans-serif;
+        }
+
+        .page {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .title {
+            margin-bottom: 8px;
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .subtitle {
+            margin-bottom: 24px;
+            color: #676767;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .message {
+            margin-bottom: 16px;
+            padding: 11px 14px;
+            border: 1px solid #d4d4d4;
+            border-radius: 9px;
+            background: #ffffff;
+            font-size: 14px;
+        }
+
+        .mode-message {
+            margin-bottom: 18px;
+            padding: 11px 14px;
+            border: 1px solid #d4d4d4;
+            border-radius: 9px;
+            background: #ffffff;
+            color: #676767;
+            font-size: 13px;
+        }
+
+        .info-box {
+            margin-bottom: 18px;
+            padding: 15px 16px;
+            background: #ffffff;
+            border: 1px solid #d4d4d4;
+            border-radius: 12px;
+        }
+
+        .info-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .info-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-label {
+            width: 90px;
+            flex-shrink: 0;
+            color: #676767;
+        }
+
+        .info-value {
+            color: #212121;
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        .status {
+            font-weight: 600;
+        }
+
+        .pending {
+            color: #b7791f;
+        }
+
+        .approved {
+            color: #16804e;
+        }
+
+        .rejected {
+            color: #dc2626;
+        }
+
+        .card {
+            overflow: hidden;
+            background: #ffffff;
+            border: 1px solid #d4d4d4;
+            border-radius: 14px;
+        }
+
+        .section-title {
+            padding: 10px 12px;
+            background: #212121;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            border: 1px solid #dcdcdc;
+            vertical-align: middle;
+        }
+
+        th {
+            width: 160px;
+            background: #f4f4f4;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        td {
+            background: #ffffff;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 9px 10px;
+            border: 1px solid #d4d4d4;
+            border-radius: 7px;
+            background: #ffffff;
+            color: #212121;
+            font: inherit;
+        }
+
+        input {
+            min-height: 38px;
+        }
+
+        textarea {
+            min-height: 90px;
+            resize: vertical;
+        }
+
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #969696;
+        }
+
+        input[readonly],
+        textarea[readonly] {
+            background: #f4f4f4;
+            color: #676767;
+            cursor: default;
+        }
+
+        .actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .btn {
+            min-height: 40px;
+            padding: 0 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #d4d4d4;
+            border-radius: 9px;
+            background: #ffffff;
+            color: #212121;
+            font: inherit;
+            font-size: 14px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background: #f1f1f1;
+        }
+
+        .btn-primary {
+            background: #212121;
+            border-color: #212121;
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background: #000000;
+        }
+
+        @@media (max-width: 768px) {
+
+            body {
+                padding: 18px;
+            }
+
+            th,
+            td {
+                padding: 9px;
+            }
+
+            th {
+                width: 120px;
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .info-row {
+                flex-direction: column;
+                gap: 3px;
+            }
+
+            .info-label {
+                width: auto;
+            }
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="page">
+
+        <div class="title">
+            手術教學申請單
+        </div>
+
+        <div class="subtitle">
+
+            @if (canSubmit)
+            {
+                <span>
+                    醫生／教授每次申請請填寫一份完整表單
+                </span>
+            }
+            else if (isViewingExisting)
+            {
+                <span>
+                    已送出教學申請內容
+                </span>
+            }
+            else
+            {
+                <span>
+                    管理員檢視模式
+                </span>
+            }
+
+        </div>
+
+        @if (!canSubmit &&
+             isViewingExisting)
+        {
+            <div class="mode-message">
+
+                此為已送出的教學申請，
+                目前僅供查看，內容不可修改。
+
+            </div>
+        }
+
+        @if (TempData["Message"] != null)
+        {
+            <div class="message">
+
+                @TempData["Message"]
+
+            </div>
+        }
+
+        @if (isViewingExisting)
+        {
+            <div class="info-box">
+
+                <div class="info-row">
+
+                    <div class="info-label">
+                        申請編號
+                    </div>
+
+                    <div class="info-value">
+                        @application.RowKey
+                    </div>
+
+                </div>
+
+                <div class="info-row">
+
+                    <div class="info-label">
+                        建立時間
+                    </div>
+
+                    <div class="info-value">
+
+                        @if (
+                            string.IsNullOrWhiteSpace(
+                                application.CreatedAt
+                            )
+                        )
+                        {
+                            <span>
+                                -
+                            </span>
+                        }
+                        else
+                        {
+                            <span>
+                                @application.CreatedAt
+                            </span>
+                        }
+
+                    </div>
+
+                </div>
+
+                <div class="info-row">
+
+                    <div class="info-label">
+                        申請狀態
+                    </div>
+
+                    <div class="info-value">
+
+                        <span class="
+                            status
+                            @statusClass">
+
+                            @statusText
+
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+        }
+
+        <form method="post"
+              action="@Url.Action(
+                  "SaveTeachingApplication",
+                  "Home"
+              )">
+
+            @Html.AntiForgeryToken()
+
+            <div class="card">
+
+                <!-- =========================
+                     基本申請資料
+                     ========================= -->
+
+                <div class="section-title">
+                    基本申請資料
+                </div>
+
+                <table>
+
+                    <tr>
+
+                        <th>
+                            申請人
+                        </th>
+
+                        <td>
+
+                            <input type="text"
+                                   name="applicant"
+                                   value="@applicantValue"
+                                   readonly />
+
+                        </td>
+
+                        <th>
+                            組別
+                        </th>
+
+                        <td>
+
+                            <input type="text"
+                                   name="groupName"
+                                   value="@application.GroupName"
+                                   readonly="@(!canSubmit)"
+                                   required />
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            預計時間
+                        </th>
+
+                        <td>
+
+                            <input type="datetime-local"
+                                   name="classTime"
+                                   value="@classTimeValue"
+                                   readonly="@(!canSubmit)"
+                                   required />
+
+                        </td>
+
+                        <th>
+                            年齡
+                        </th>
+
+                        <td>
+
+                            <input type="number"
+                                   name="age"
+                                   value="@application.Age"
+                                   min="0"
+                                   max="120"
+                                   readonly="@(!canSubmit)" />
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            科別（縮寫）
+                        </th>
+
+                        <td>
+
+                            <input type="text"
+                                   name="department"
+                                   value="@application.Department"
+                                   placeholder="例如：GS、CV、NS"
+                                   readonly="@(!canSubmit)" />
+
+                        </td>
+
+                        <th>
+                            主要醫生
+                        </th>
+
+                        <td>
+
+                            <input type="text"
+                                   name="mainDoctor"
+                                   value="@application.MainDoctor"
+                                   readonly="@(!canSubmit)" />
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            助手
+                        </th>
+
+                        <td>
+
+                            <input type="text"
+                                   name="assistant"
+                                   value="@application.Assistant"
+                                   readonly="@(!canSubmit)" />
+
+                        </td>
+
+                        <th>
+                            護理人員
+                        </th>
+
+                        <td>
+
+                            <input type="text"
+                                   name="nurse"
+                                   value="@application.Nurse"
+                                   readonly="@(!canSubmit)" />
+
+                        </td>
+
+                    </tr>
+
+                </table>
+
+                <!-- =========================
+                     病歷與診斷
+                     ========================= -->
+
+                <div class="section-title">
+                    病歷與診斷
+                </div>
+
+                <table>
+
+                    <tr>
+
+                        <th>
+                            基本病史
+                        </th>
+
+                        <td>
+
+                            <textarea name="medicalHistory"
+                                      readonly="@(!canSubmit)">@application.MedicalHistory</textarea>
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            基本診斷
+                        </th>
+
+                        <td>
+
+                            <textarea name="diagnosis"
+                                      readonly="@(!canSubmit)">@application.Diagnosis</textarea>
+
+                        </td>
+
+                    </tr>
+
+                </table>
+
+                <!-- =========================
+                     手術教學內容
+                     ========================= -->
+
+                <div class="section-title">
+                    手術教學內容
+                </div>
+
+                <table>
+
+                    <tr>
+
+                        <th>
+                            課程內容
+                        </th>
+
+                        <td>
+
+                            <textarea name="courseContent"
+                                      readonly="@(!canSubmit)">@application.CourseContent</textarea>
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            手術主題
+                        </th>
+
+                        <td>
+
+                            <input type="text"
+                                   name="surgeryTopic"
+                                   value="@application.SurgeryTopic"
+                                   readonly="@(!canSubmit)" />
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            手術方式／怎麼做
+                        </th>
+
+                        <td>
+
+                            <textarea name="procedure"
+                                      readonly="@(!canSubmit)">@application.Procedure</textarea>
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            手術部位
+                        </th>
+
+                        <td>
+
+                            <input type="text"
+                                   name="bodyPart"
+                                   value="@application.BodyPart"
+                                   readonly="@(!canSubmit)" />
+
+                        </td>
+
+                    </tr>
+
+                </table>
+
+            </div>
+
+<div class="actions">
+
+    <button type="button"
+            class="btn"
+            onclick="history.back()">
+        ← 返回上一頁
+    </button>
+
+    <a class="btn"
+       href="@Url.Action(
+           "TeachingApplicationReport",
+           "Home"
+       )">
+        返回申請報表
+    </a>
+
+    @if (canSubmit)
+                {
+                    <button type="submit"
+                            class="btn btn-primary">
+
+                        送出申請
+
+                    </button>
+                }
+
+            </div>
+
+        </form>
+
+    </div>
+
+</body>
+
+</html>

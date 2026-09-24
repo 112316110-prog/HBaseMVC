@@ -1932,7 +1932,60 @@
                 </a>
             }
             <div class="sidebar-section">教學功能</div>
+            @if (role == "Teacher" ||
+     role == "Admin")
+{
+    <a class="nav-item"
+       href="@Url.Action(
+           "TeachingApplication",
+           "Home"
+       )"
+       style="text-decoration:none;">
 
+        <svg class="nav-icon"
+             fill="none"
+             stroke="currentColor"
+             stroke-width="1.5"
+             viewBox="0 0 24 24">
+
+            <path stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M9 12h6m-6 4h6m2.25 4.5h-10.5A2.25 2.25 0 014.5 18.25V5.75A2.25 2.25 0 016.75 3.5h7.5l5.25 5.25v9.5a2.25 2.25 0 01-2.25 2.25z" />
+
+        </svg>
+
+        教學申請
+
+    </a>
+}
+
+@if (role == "Teacher" ||
+     role == "Student" ||
+     role == "Admin")
+{
+    <a class="nav-item"
+       href="@Url.Action(
+           "TeachingApplicationReport",
+           "Home"
+       )"
+       style="text-decoration:none;">
+
+        <svg class="nav-icon"
+             fill="none"
+             stroke="currentColor"
+             stroke-width="1.5"
+             viewBox="0 0 24 24">
+
+            <path stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M3.75 5.25h16.5M3.75 9.75h16.5M3.75 14.25h16.5M3.75 18.75h16.5" />
+
+        </svg>
+
+        申請報表
+
+    </a>
+}
             @if (isStudent)
             {
                 <a class="nav-item"
@@ -2086,11 +2139,12 @@
                     ☰
                 </button>
 
-                <div class="app-header-title" id="current-page-title">
-                    @(isAdmin ? "手術台資料" : "AI 助教")
-                </div>
+<div class="app-header-title" id="current-page-title">
+    @(isAdmin ? "手術台資料" : "AI 助教")
+</div>
 
-                <div class="app-header-actions">
+
+<div class="app-header-actions">
                     <span class="system-status">
                         <span class="status-dot"></span>
                         系統正常

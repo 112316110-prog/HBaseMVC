@@ -1,0 +1,674 @@
+﻿@model List<HBaseMVC.Models.TeachingApplication>
+@using Microsoft.AspNetCore.Http
+
+@{
+    Layout = null;
+
+    ViewBag.Title =
+        "手術教學申請報表";
+
+    string role =
+        Context.Session.GetString("Role") ?? "";
+
+    string loginId =
+        Context.Session.GetString("LoginId") ?? "";
+
+    bool canViewApplication =
+        role == "Teacher" ||
+        role == "Admin";
+}
+
+<!DOCTYPE html>
+
+<html lang="zh-TW">
+
+<head>
+
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width,
+                   initial-scale=1.0" />
+
+    <title>
+        @ViewBag.Title
+    </title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 30px;
+            background: #f7f7f8;
+            color: #212121;
+
+            font-family:
+                "Noto Sans TC",
+                "Microsoft JhengHei",
+                Arial,
+                sans-serif;
+        }
+
+        .page {
+            max-width: 1500px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .page-header-spacer {
+            flex: 1;
+        }
+
+        .message {
+            margin-bottom: 16px;
+            padding: 11px 14px;
+
+            border:
+                1px solid #d4d4d4;
+
+            border-radius: 9px;
+
+            background:
+                #ffffff;
+
+            font-size: 14px;
+        }
+
+        .card {
+            overflow-x: auto;
+
+            background:
+                #ffffff;
+
+            border:
+                1px solid #e5e5e5;
+
+            border-radius: 14px;
+        }
+
+        table {
+            width: 100%;
+            min-width: 1700px;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 10px 12px;
+
+            border-bottom:
+                1px solid #e5e5e5;
+
+            vertical-align: top;
+
+            font-size: 13px;
+
+            text-align: left;
+        }
+
+        th {
+            background:
+                #f4f4f4;
+
+            color:
+                #676767;
+
+            font-weight:
+                600;
+
+            white-space:
+                nowrap;
+        }
+
+        td {
+            background:
+                #ffffff;
+        }
+
+        tbody tr:hover td {
+            background:
+                #fafafa;
+        }
+
+        .text-cell {
+            min-width: 180px;
+            max-width: 260px;
+
+            white-space:
+                pre-wrap;
+
+            word-break:
+                break-word;
+        }
+
+        .id-cell {
+            min-width: 210px;
+
+            white-space:
+                nowrap;
+        }
+
+        .status {
+            font-weight: 600;
+
+            white-space:
+                nowrap;
+        }
+
+        .pending {
+            color:
+                #b7791f;
+        }
+
+        .approved {
+            color:
+                #16804e;
+        }
+
+        .rejected {
+            color:
+                #dc2626;
+        }
+
+        .empty {
+            padding: 40px;
+
+            color:
+                #969696;
+
+            text-align:
+                center;
+        }
+
+        .btn {
+            min-height: 36px;
+            padding: 0 14px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            border:
+                1px solid #d4d4d4;
+
+            border-radius:
+                8px;
+
+            background:
+                #ffffff;
+
+            color:
+                #212121;
+
+            font:
+                inherit;
+
+            font-size:
+                13px;
+
+            font-weight:
+                500;
+
+            text-decoration:
+                none;
+
+            white-space:
+                nowrap;
+
+            cursor:
+                pointer;
+        }
+
+        .btn:hover {
+            background:
+                #f1f1f1;
+        }
+
+        .btn-primary {
+            background:
+                #212121;
+
+            border-color:
+                #212121;
+
+            color:
+                #ffffff;
+        }
+
+        .btn-primary:hover {
+            background:
+                #000000;
+        }
+
+        .btn-danger {
+            color:
+                #dc2626;
+
+            border-color:
+                #efcaca;
+        }
+
+        .btn-danger:hover {
+            background:
+                #fff1f1;
+
+            color:
+                #dc2626;
+        }
+
+        .action-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+
+            white-space:
+                nowrap;
+        }
+
+        .action-group form {
+            margin: 0;
+        }
+
+        @@media (max-width: 768px) {
+
+            body {
+                padding: 18px;
+            }
+
+            .page-header {
+                align-items:
+                    flex-start;
+
+                flex-direction:
+                    column;
+            }
+
+            .page-header-spacer {
+                display: none;
+            }
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="page">
+
+<div class="page-header">
+
+    <h2>
+        手術教學申請報表
+    </h2>
+
+    <div class="page-header-spacer">
+    </div>
+
+    @if (role == "Teacher")
+    {
+        <a class="btn btn-primary"
+           href="@Url.Action(
+               "TeachingApplication",
+               "Home"
+           )">
+            ＋ 新增教學申請
+        </a>
+    }
+
+    <button type="button"
+            class="btn"
+            onclick="history.back()">
+        ← 返回上一頁
+    </button>
+
+</div>
+
+        @if (TempData["Message"] != null)
+        {
+            <div class="message">
+
+                @TempData["Message"]
+
+            </div>
+        }
+
+
+        <div class="card">
+
+            @if (Model == null ||
+                 Model.Count == 0)
+            {
+                <div class="empty">
+
+                    目前尚無教學申請資料。
+
+                </div>
+            }
+            else
+            {
+                <table>
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                申請編號
+                            </th>
+
+                            <th>
+                                申請人
+                            </th>
+
+                            <th>
+                                組別
+                            </th>
+
+                            <th>
+                                預計時間
+                            </th>
+
+                            <th>
+                                年齡
+                            </th>
+
+                            <th>
+                                科別
+                            </th>
+
+                            <th>
+                                基本病史
+                            </th>
+
+                            <th>
+                                基本診斷
+                            </th>
+
+                            <th>
+                                主要醫生
+                            </th>
+
+                            <th>
+                                助手
+                            </th>
+
+                            <th>
+                                護理人員
+                            </th>
+
+                            <th>
+                                課程內容
+                            </th>
+
+                            <th>
+                                手術主題
+                            </th>
+
+                            <th>
+                                手術方式
+                            </th>
+
+                            <th>
+                                手術部位
+                            </th>
+
+                            <th>
+                                狀態
+                            </th>
+
+                            @if (canViewApplication)
+                            {
+                                <th>
+                                    功能
+                                </th>
+                            }
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        @foreach (
+                            var item
+                            in Model
+                        )
+                        {
+                            string statusClass =
+                                item.Status == "Approved"
+                                    ? "approved"
+                                    : item.Status == "Rejected"
+                                        ? "rejected"
+                                        : "pending";
+
+
+                            string statusText =
+                                item.Status == "Approved"
+                                    ? "已核准"
+                                    : item.Status == "Rejected"
+                                        ? "已退回"
+                                        : "待審核";
+
+
+                            <tr>
+
+                                <td class="id-cell">
+
+                                    @item.RowKey
+
+                                </td>
+
+
+                                <td>
+
+                                    @item.Applicant
+
+                                </td>
+
+
+                                <td>
+
+                                    @item.GroupName
+
+                                </td>
+
+
+                                <td>
+
+                                    @item.ClassTime
+
+                                </td>
+
+
+                                <td>
+
+                                    @item.Age
+
+                                </td>
+
+
+                                <td>
+
+                                    @item.Department
+
+                                </td>
+
+
+                                <td class="text-cell">
+
+                                    @item.MedicalHistory
+
+                                </td>
+
+
+                                <td class="text-cell">
+
+                                    @item.Diagnosis
+
+                                </td>
+
+
+                                <td>
+
+                                    @item.MainDoctor
+
+                                </td>
+
+
+                                <td>
+
+                                    @item.Assistant
+
+                                </td>
+
+
+                                <td>
+
+                                    @item.Nurse
+
+                                </td>
+
+
+                                <td class="text-cell">
+
+                                    @item.CourseContent
+
+                                </td>
+
+
+                                <td class="text-cell">
+
+                                    @item.SurgeryTopic
+
+                                </td>
+
+
+                                <td class="text-cell">
+
+                                    @item.Procedure
+
+                                </td>
+
+
+                                <td>
+
+                                    @item.BodyPart
+
+                                </td>
+
+
+                                <td class="status @statusClass">
+
+                                    @statusText
+
+                                </td>
+
+
+                                @if (canViewApplication)
+                                {
+                                    <td>
+
+                                        <div class="action-group">
+
+                                            <a class="btn"
+                                               href="@Url.Action(
+                                                   "TeachingApplication",
+                                                   "Home",
+                                                   new
+                                                   {
+                                                       rowKey =
+                                                           item.RowKey
+                                                   }
+                                               )">
+
+                                                查看
+
+                                            </a>
+
+
+                                            @if (
+                                                role == "Admin"
+                                                ||
+                                                (
+                                                    role == "Teacher"
+                                                    &&
+                                                    string.Equals(
+                                                        item.Applicant?.Trim(),
+                                                        loginId.Trim(),
+                                                        StringComparison.OrdinalIgnoreCase
+                                                    )
+                                                    &&
+                                                    string.Equals(
+                                                        item.Status,
+                                                        "Pending",
+                                                        StringComparison.OrdinalIgnoreCase
+                                                    )
+                                                )
+                                            )
+                                            {
+                                                <form method="post"
+                                                      action="@Url.Action(
+                                                          "DeleteTeachingApplication",
+                                                          "Home"
+                                                      )"
+                                                      onsubmit="return confirm('確定要刪除這筆教學申請嗎？刪除後無法復原。');">
+
+                                                    @Html.AntiForgeryToken()
+
+                                                    <input type="hidden"
+                                                           name="rowKey"
+                                                           value="@item.RowKey" />
+
+                                                    <button type="submit"
+                                                            class="btn btn-danger">
+
+                                                        刪除
+
+                                                    </button>
+
+                                                </form>
+                                            }
+
+                                        </div>
+
+                                    </td>
+                                }
+
+                            </tr>
+                        }
+
+                    </tbody>
+
+                </table>
+            }
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>

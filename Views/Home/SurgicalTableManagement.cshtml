@@ -881,7 +881,63 @@
             }
 
             <div class="sidebar-section">教學功能</div>
+            @if (role == "Teacher" ||
+     role == "Admin")
+{
+    <a class="nav-item"
+       href="@Url.Action(
+           "TeachingApplication",
+           "Home"
+       )"
+       style="text-decoration:none;">
 
+        <svg class="nav-icon"
+             fill="none"
+             stroke="currentColor"
+             stroke-width="1.5"
+             viewBox="0 0 24 24">
+
+            <path stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M9 12h6m-6 4h6
+                     M7 3h7l5 5v11
+                     a2 2 0 01-2 2H7
+                     a2 2 0 01-2-2V5
+                     a2 2 0 012-2z" />
+        </svg>
+
+        教學申請
+    </a>
+}
+
+@if (role == "Teacher" ||
+     role == "Student" ||
+     role == "Admin")
+{
+    <a class="nav-item"
+       href="@Url.Action(
+           "TeachingApplicationReport",
+           "Home"
+       )"
+       style="text-decoration:none;">
+
+        <svg class="nav-icon"
+             fill="none"
+             stroke="currentColor"
+             stroke-width="1.5"
+             viewBox="0 0 24 24">
+
+            <path stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M4 5h16
+                     M4 10h16
+                     M4 15h10
+                     M4 20h10" />
+        </svg>
+
+        申請報表
+    </a>
+}
             @if (isStudent)
             {
                 <a class="nav-item"
@@ -1043,15 +1099,16 @@
             </header>
 
             <div class="page">
+<div class="top">
 
-                <div class="top">
+    <div class="title">
+        手術台資料
+    </div>
 
-                    <div class="title">
-                        手術台資料
-                    </div>
+    <div class="top-spacer">
+    </div>
 
-                </div>
-
+</div>
 
                 @if (TempData["Message"] != null)
                 {

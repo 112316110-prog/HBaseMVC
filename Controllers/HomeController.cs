@@ -2311,7 +2311,8 @@ namespace HBaseMVC.Controllers
             string code = GenerateCaptcha();
             HttpContext.Session.SetString("Captcha", code);
             ViewBag.Captcha = code;
-
+            TempData.Remove("Message");
+            TempData.Remove("MessageType");
             return View();
         }
 
@@ -3190,7 +3191,494 @@ namespace HBaseMVC.Controllers
                 return result;
             }
         }
+        private async Task<List<TeachingApplication>>
+    GetTeachingApplications()
+        {
+            var result =
+                new List<TeachingApplication>();
 
+            try
+            {
+                using var cts =
+                    new CancellationTokenSource(
+                        TimeSpan.FromSeconds(10)
+                    );
+
+                var request =
+                    new HttpRequestMessage(
+                        HttpMethod.Get,
+                        "teaching_application/*"
+                    );
+
+                request.Headers.Add(
+                    "Accept",
+                    "application/json"
+                );
+
+                var response =
+                    await _client.SendAsync(
+                        request,
+                        cts.Token
+                    );
+
+                if (!response.IsSuccessStatusCode)
+                    return result;
+
+                string json =
+                    await response.Content
+                        .ReadAsStringAsync();
+
+                if (string.IsNullOrWhiteSpace(json))
+                    return result;
+
+                using JsonDocument doc =
+                    JsonDocument.Parse(json);
+
+                if (!doc.RootElement.TryGetProperty(
+                        "Row",
+                        out JsonElement rows))
+                {
+                    return result;
+                }
+
+                foreach (
+                    var row
+                    in rows.EnumerateArray()
+                )
+                {
+                    string rowKey =
+                        Decode(
+                            row.GetProperty("key")
+                                .GetString() ?? ""
+                        );
+
+                    var item =
+                        new TeachingApplication
+                        {
+                            RowKey = rowKey
+                        };
+
+                    if (!row.TryGetProperty(
+                            "Cell",
+                            out JsonElement cells))
+                    {
+                        result.Add(item);
+                        continue;
+                    }
+
+                    foreach (
+                        var cell
+                        in cells.EnumerateArray()
+                    )
+                    {
+                        string column =
+                            Decode(
+                                cell
+                                    .GetProperty(
+                                        "column"
+                                    )
+                                    .GetString()
+                                ?? ""
+                            );
+
+                        string value =
+                            Decode(
+                                cell
+                                    .GetProperty("$")
+                                    .GetString()
+                                ?? ""
+                            );
+
+                        switch (column)
+                        {
+                            case "info:applicant":
+                                item.Applicant =
+                                    value;
+                                break;
+
+                            case "info:group_name":
+                                item.GroupName =
+                                    value;
+                                break;
+
+                            case "info:class_time":
+                                item.ClassTime =
+                                    value;
+                                break;
+
+                            case "info:age":
+                                item.Age =
+                                    value;
+                                break;
+
+                            case "info:medical_history":
+                                item.MedicalHistory =
+                                    value;
+                                break;
+
+                            case "info:diagnosis":
+                                item.Diagnosis =
+                                    value;
+                                break;
+
+                            case "info:department":
+                                item.Department =
+                                    value;
+                                break;
+
+                            case "info:assistant":
+                                item.Assistant =
+                                    value;
+                                break;
+
+                            case "info:main_doctor":
+                                item.MainDoctor =
+                                    value;
+                                break;
+
+                            case "info:nurse":
+                                item.Nurse =
+                                    value;
+                                break;
+
+                            case "info:course_content":
+                                item.CourseContent =
+                                    value;
+                                break;
+
+                            case "info:surgery_topic":
+                                item.SurgeryTopic =
+                                    value;
+                                break;
+
+                            case "info:procedure":
+                                item.Procedure =
+                                    value;
+                                break;
+
+                            case "info:body_part":
+                                item.BodyPart =
+                                    value;
+                                break;
+
+                            case "info:created_at":
+                                item.CreatedAt =
+                                    value;
+                                break;
+
+                            case "info:status":
+                                item.Status =
+                                    value;
+                                break;
+
+                            case "info:approved_time":
+                                item.ApprovedTime =
+                                    value;
+                                break;
+
+                            case "info:table_id":
+                                item.TableId =
+                                    value;
+                                break;
+
+                            case "info:cadaver_row_key":
+                                item.CadaverRowKey =
+                                    value;
+                                break;
+
+                            case "info:admin_reply":
+                                item.AdminReply =
+                                    value;
+                                break;
+                        }
+                    }
+
+                    result.Add(item);
+                }
+
+                return result
+                    .OrderByDescending(x =>
+                        DateTime.TryParse(
+                            x.CreatedAt,
+                            out DateTime date
+                        )
+                            ? date
+                            : DateTime.MinValue
+                    )
+                    .ToList();
+            }
+            catch
+            {
+                return result;
+            }
+        }
+        [HttpGet]
+        public async Task<IActionResult> TeachingApplication(
+            string rowKey = "")
+        {
+            var block =
+                RequireLogin();
+
+            if (block != null)
+                return block;
+
+            string role =
+                HttpContext.Session
+                    .GetString("Role")
+                ?? "";
+
+            if (role != "Teacher" &&
+                role != "Admin")
+            {
+                return Forbid();
+            }
+
+            rowKey =
+                rowKey?.Trim() ?? "";
+
+            // =========================
+            // 老師：建立新申請
+            // =========================
+            if (role == "Teacher" &&
+                string.IsNullOrWhiteSpace(rowKey))
+            {
+                ViewBag.CanSubmit = true;
+
+                return View(
+                    new TeachingApplication()
+                );
+            }
+
+            // =========================
+            // Admin：不可建立空白申請
+            // =========================
+            if (role == "Admin" &&
+                string.IsNullOrWhiteSpace(rowKey))
+            {
+                return RedirectToAction(
+                    "TeachingApplicationReport"
+                );
+            }
+
+            // =========================
+            // 查看指定申請
+            // =========================
+            var applications =
+                await GetTeachingApplications();
+var application =
+    applications.FirstOrDefault(x =>
+        string.Equals(
+            x.RowKey,
+            rowKey,
+            StringComparison.OrdinalIgnoreCase
+        )
+    );
+
+            if (application == null)
+            {
+                TempData["Message"] =
+                    "找不到指定的教學申請。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "TeachingApplicationReport"
+                );
+            }
+
+            ViewBag.CanSubmit = false;
+
+            return View(application);
+        }
+        [HttpGet]
+        public async Task<IActionResult> TeachingApplicationReport()
+        {
+            var block =
+                RequireLogin();
+
+            if (block != null)
+                return block;
+
+            string role =
+                HttpContext.Session
+                    .GetString("Role")
+                ?? "";
+
+            if (role != "Teacher" &&
+                role != "Student" &&
+                role != "Admin")
+            {
+                return Forbid();
+            }
+
+            var applications =
+                await GetTeachingApplications();
+
+            return View(applications);
+        }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteTeachingApplication(
+    string rowKey)
+        {
+            var block =
+                RequireLogin();
+
+            if (block != null)
+                return block;
+
+            string role =
+                HttpContext.Session
+                    .GetString("Role")
+                ?? "";
+
+            string loginId =
+                HttpContext.Session
+                    .GetString("LoginId")
+                ?? "";
+
+            // =========================
+            // 只有 Teacher / Admin 可以刪除
+            // =========================
+            if (role != "Teacher" &&
+                role != "Admin")
+            {
+                return Forbid();
+            }
+
+            rowKey =
+                rowKey?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(rowKey))
+            {
+                TempData["Message"] =
+                    "刪除失敗：缺少申請編號。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "TeachingApplicationReport"
+                );
+            }
+
+            // =========================
+            // 取得目前申請
+            // =========================
+            var applications =
+                await GetTeachingApplications();
+
+            var application =
+                applications.FirstOrDefault(x =>
+                    string.Equals(
+                        x.RowKey,
+                        rowKey,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+
+            if (application == null)
+            {
+                TempData["Message"] =
+                    "找不到指定的教學申請。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "TeachingApplicationReport"
+                );
+            }
+
+            // =========================
+            // Teacher：
+            // 只能刪除自己的 Pending 申請
+            // =========================
+            if (role == "Teacher")
+            {
+                if (!string.Equals(
+                    application.Applicant?.Trim(),
+                    loginId.Trim(),
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return Forbid();
+                }
+
+                if (!string.Equals(
+                    application.Status,
+                    "Pending",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    TempData["Message"] =
+                        "此申請已完成審核，無法刪除。";
+
+                    TempData["MessageType"] =
+                        "error";
+
+                    return RedirectToAction(
+                        "TeachingApplicationReport"
+                    );
+                }
+            }
+
+            // =========================
+            // Admin：
+            // 可刪除任何人的任何狀態申請
+            // =========================
+
+            try
+            {
+                string encodedRowKey =
+                    Uri.EscapeDataString(
+                        rowKey
+                    );
+
+                var response =
+                    await _client.DeleteAsync(
+                        $"teaching_application/{encodedRowKey}"
+                    );
+
+                if (!response.IsSuccessStatusCode &&
+                    response.StatusCode !=
+                        System.Net.HttpStatusCode.NotFound)
+                {
+                    TempData["Message"] =
+                        "刪除申請失敗。";
+
+                    TempData["MessageType"] =
+                        "error";
+
+                    return RedirectToAction(
+                        "TeachingApplicationReport"
+                    );
+                }
+
+                TempData["Message"] =
+                    "申請已刪除。";
+
+                TempData["MessageType"] =
+                    "success";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "刪除教學申請失敗。RowKey={RowKey}",
+                    rowKey
+                );
+
+                TempData["Message"] =
+                    "刪除申請時發生錯誤。";
+
+                TempData["MessageType"] =
+                    "error";
+            }
+
+            return RedirectToAction(
+                "TeachingApplicationReport"
+            );
+        }
         // =========================
         // 學生課程筆記
         // =========================
@@ -17480,6 +17968,244 @@ namespace HBaseMVC.Controllers
 
             return RedirectToAction(
                 "SurgicalTableManagement"
+            );
+        }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveTeachingApplication(
+    string applicant,
+    string groupName,
+    string classTime,
+    string age,
+    string medicalHistory,
+    string diagnosis,
+    string department,
+    string assistant,
+    string mainDoctor,
+    string nurse,
+    string courseContent,
+    string surgeryTopic,
+    string procedure,
+    string bodyPart)
+        {
+            var block = RequireLogin();
+
+            if (block != null)
+                return block;
+
+            string role =
+                HttpContext.Session.GetString("Role")
+                ?? "";
+
+            // Teacher 與 Admin 可以進行刪除
+            if (role != "Teacher" &&
+                role != "Admin")
+            {
+                return Forbid();
+            }
+
+            string loginId =
+                HttpContext.Session.GetString("LoginId")
+                ?? "";
+
+            applicant =
+                applicant?.Trim() ?? "";
+
+            groupName =
+                groupName?.Trim() ?? "";
+
+            classTime =
+                classTime?.Trim() ?? "";
+
+            age =
+                age?.Trim() ?? "";
+
+            medicalHistory =
+                medicalHistory?.Trim() ?? "";
+
+            diagnosis =
+                diagnosis?.Trim() ?? "";
+
+            department =
+                department?.Trim() ?? "";
+
+            assistant =
+                assistant?.Trim() ?? "";
+
+            mainDoctor =
+                mainDoctor?.Trim() ?? "";
+
+            nurse =
+                nurse?.Trim() ?? "";
+
+            courseContent =
+                courseContent?.Trim() ?? "";
+
+            surgeryTopic =
+                surgeryTopic?.Trim() ?? "";
+
+            procedure =
+                procedure?.Trim() ?? "";
+
+            bodyPart =
+                bodyPart?.Trim() ?? "";
+
+            // 申請人一律以登入帳號為準
+            applicant = loginId;
+
+            if (string.IsNullOrWhiteSpace(groupName) ||
+                string.IsNullOrWhiteSpace(classTime))
+            {
+                TempData["Message"] =
+                    "申請失敗：組別與預計時間為必填。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "TeachingApplication"
+                );
+            }
+
+            if (!DateTime.TryParse(
+                    classTime,
+                    out DateTime parsedClassTime))
+            {
+                TempData["Message"] =
+                    "申請失敗：時間格式錯誤。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "TeachingApplication"
+                );
+            }
+
+            string rowKey =
+                "APP_" +
+                DateTime.Now.ToString(
+                    "yyyyMMddHHmmss"
+                ) +
+                "_" +
+                Guid.NewGuid()
+                    .ToString("N")
+                    .Substring(0, 6);
+
+            string createdAt =
+                DateTime.Now.ToString(
+                    "yyyy-MM-dd HH:mm:ss"
+                );
+
+            string xml = $@"
+<CellSet>
+  <Row key=""{ToBase64(rowKey)}"">
+
+    <Cell column=""{ToBase64("info:applicant")}"">
+      {ToBase64(applicant)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:group_name")}"">
+      {ToBase64(groupName)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:class_time")}"">
+      {ToBase64(
+                  parsedClassTime.ToString(
+                      "yyyy-MM-dd HH:mm"
+                  )
+              )}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:age")}"">
+      {ToBase64(age)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:medical_history")}"">
+      {ToBase64(medicalHistory)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:diagnosis")}"">
+      {ToBase64(diagnosis)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:department")}"">
+      {ToBase64(department)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:assistant")}"">
+      {ToBase64(assistant)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:main_doctor")}"">
+      {ToBase64(mainDoctor)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:nurse")}"">
+      {ToBase64(nurse)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:course_content")}"">
+      {ToBase64(courseContent)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:surgery_topic")}"">
+      {ToBase64(surgeryTopic)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:procedure")}"">
+      {ToBase64(procedure)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:body_part")}"">
+      {ToBase64(bodyPart)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:created_at")}"">
+      {ToBase64(createdAt)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:status")}"">
+      {ToBase64("Pending")}
+    </Cell>
+
+  </Row>
+</CellSet>";
+
+            using var content =
+                new StringContent(
+                    xml,
+                    Encoding.UTF8,
+                    "text/xml"
+                );
+
+            HttpResponseMessage response =
+                await _client.PutAsync(
+                    $"teaching_application/{rowKey}",
+                    content
+                );
+
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["Message"] =
+                    "申請送出失敗，請確認 HBase teaching_application 資料表。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "TeachingApplication"
+                );
+            }
+
+            TempData["Message"] =
+                "申請已成功送出。";
+
+            TempData["MessageType"] =
+                "success";
+
+            return RedirectToAction(
+                "TeachingApplicationReport"
             );
         }
         [HttpPost]
