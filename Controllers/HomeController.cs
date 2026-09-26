@@ -1233,6 +1233,8 @@ namespace HBaseMVC.Controllers
                     Dictionary<string, string> videoTypeMap = new();
                     Dictionary<string, string> categoryMap = new();
                     Dictionary<string, string> drawingMap = new();
+                    Dictionary<string, string> lifePhotoMap = new();
+                    Dictionary<string, string> lifePhotoNoteMap = new();
 
 
                     // =========================
@@ -1864,6 +1866,34 @@ namespace HBaseMVC.Controllers
                             medicalAnnotatedImageMap[id] =
                                 value;
                         }
+
+                        else if (column.StartsWith(
+    "info:life_photo_note_",
+    StringComparison.OrdinalIgnoreCase))
+                        {
+                            string id =
+                                column.Replace(
+                                    "info:life_photo_note_",
+                                    "",
+                                    StringComparison.OrdinalIgnoreCase
+                                );
+
+                            lifePhotoNoteMap[id] = value;
+                        }
+                        else if (column.StartsWith(
+                            "info:life_photo_",
+                            StringComparison.OrdinalIgnoreCase))
+                        {
+                            string id =
+                                column.Replace(
+                                    "info:life_photo_",
+                                    "",
+                                    StringComparison.OrdinalIgnoreCase
+                                );
+
+                            lifePhotoMap[id] = value;
+                        }
+
                         // info:* 圖片路徑
 
                         else if (column.StartsWith("info:image_"))
@@ -1938,6 +1968,20 @@ namespace HBaseMVC.Controllers
                         cadaver.Notes.Add(noteMap.ContainsKey(id) ? noteMap[id] : "");
                         cadaver.IsAliveImages.Add(aliveMap.ContainsKey(id) && aliveMap[id]);
                         cadaver.DrawingJsonList.Add(drawingMap.ContainsKey(id) ? drawingMap[id] : "[]");
+                    }
+
+                    foreach (var kv in lifePhotoMap.OrderBy(x => x.Key))
+                    {
+                        string id = kv.Key;
+
+                        cadaver.LifePhotoIds.Add(id);
+                        cadaver.LifePhotoPaths.Add(kv.Value);
+
+                        cadaver.LifePhotoNotes.Add(
+                            lifePhotoNoteMap.ContainsKey(id)
+                                ? lifePhotoNoteMap[id]
+                                : ""
+                        );
                     }
 
                     // =========================
@@ -2168,6 +2212,459 @@ namespace HBaseMVC.Controllers
             }
         }
 
+        // HBase 新增 / 修改欄位
+        // HBase 新增 / 修改單一欄位
+        private async Task PutCell(
+            string row,
+            string column,
+            string value)
+        {
+            string xml = $@"
+        <CellSet>
+          <Row key=""{ToBase64(row)}"">
+          <Cell column=""{ToBase64(column)}"">
+        {ToBase64(value)}
+        </Cell>
+        </Row>
+      </CellSet>";
+
+            var content =
+                new StringContent(
+                    xml,
+                    Encoding.UTF8,
+                    "text/xml"
+                );
+
+            HttpResponseMessage response =
+                await _client.PutAsync(
+                    $"cadaver/{Uri.EscapeDataString(row)}",
+                    content
+                );
+
+            response.EnsureSuccessStatusCode();
+        }
+
+
+        // HBase 刪除欄位
+        private async Task DeleteCell(
+            string row,
+            string column)
+        {
+            string url =
+                $"cadaver/{Uri.EscapeDataString(row)}/" +
+                $"{Uri.EscapeDataString(column)}";
+
+            HttpResponseMessage response =
+                await _client.DeleteAsync(url);
+
+            if (!response.IsSuccessStatusCode &&
+                response.StatusCode !=
+                    System.Net.HttpStatusCode.NotFound)
+            {
+                response.EnsureSuccessStatusCode();
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> LifePhotos(string row)
+        {
+            var block = RequireLogin();
+
+            if (block != null)
+                return block;
+
+            row = row?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(row))
+                return RedirectToAction("Index");
+
+            List<Cadaver> data =
+                await GetAllData();
+
+            Cadaver? patient =
+                data.FirstOrDefault(x =>
+                    string.Equals(
+                        x.RowKey,
+                        row,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+
+            if (patient == null)
+            {
+                TempData["Message"] =
+                    "找不到指定的大體老師資料。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "Index",
+                    new { panel = "list" }
+                );
+            }
+
+            return View(patient);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UploadLifePhoto(
+    string row,
+    IFormFile photo,
+    string note)
+        {
+            var block = RequireAdmin();
+
+            if (block != null)
+                return block;
+
+            row = row?.Trim() ?? "";
+            note = note?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(row))
+            {
+                TempData["Message"] =
+                    "缺少大體老師編號。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction("Index");
+            }
+
+            if (photo == null ||
+                photo.Length == 0)
+            {
+                TempData["Message"] =
+                    "請選擇照片。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "LifePhotos",
+                    new { row }
+                );
+            }
+
+            string extension =
+                Path.GetExtension(photo.FileName)
+                    .ToLowerInvariant();
+
+            string[] allowedExtensions =
+            {
+        ".jpg",
+        ".jpeg",
+        ".png"
+    };
+
+            if (!allowedExtensions.Contains(extension))
+            {
+                TempData["Message"] =
+                    "只允許上傳 JPG、JPEG、PNG。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "LifePhotos",
+                    new { row }
+                );
+            }
+
+            // 10 MB
+            if (photo.Length > 10 * 1024 * 1024)
+            {
+                TempData["Message"] =
+                    "圖片大小不可超過 10 MB。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "LifePhotos",
+                    new { row }
+                );
+            }
+
+            string id =
+                Guid.NewGuid()
+                    .ToString("N");
+
+            string folder =
+                Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    "wwwroot",
+                    "life-photos",
+                    row
+                );
+
+            Directory.CreateDirectory(folder);
+
+            string fileName =
+                id + extension;
+
+            string fullPath =
+                Path.Combine(
+                    folder,
+                    fileName
+                );
+
+            using (FileStream stream =
+                new FileStream(
+                    fullPath,
+                    FileMode.Create))
+            {
+                await photo.CopyToAsync(stream);
+            }
+
+            string webPath =
+                $"/life-photos/{row}/{fileName}";
+
+            await PutCell(
+                row,
+                $"info:life_photo_{id}",
+                webPath
+            );
+
+            await PutCell(
+                row,
+                $"info:life_photo_note_{id}",
+                note
+            );
+
+            TempData["Message"] =
+                "生前照片新增成功。";
+
+            TempData["MessageType"] =
+                "success";
+
+            return RedirectToAction(
+                "LifePhotos",
+                new { row }
+            );
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateLifePhoto(
+    string row,
+    string photoId,
+    string note)
+        {
+            var block = RequireAdmin();
+
+            if (block != null)
+                return block;
+
+            row = row?.Trim() ?? "";
+            photoId = photoId?.Trim() ?? "";
+            note = note?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(row) ||
+                string.IsNullOrWhiteSpace(photoId))
+            {
+                return BadRequest();
+            }
+
+            await PutCell(
+                row,
+                $"info:life_photo_note_{photoId}",
+                note
+            );
+
+            TempData["Message"] =
+                "生前照片資料修改成功。";
+
+            TempData["MessageType"] =
+                "success";
+
+            return RedirectToAction(
+                "LifePhotos",
+                new { row }
+            );
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteLifePhoto(
+    string row,
+    string photoId,
+    string photoPath)
+        {
+            var block = RequireAdmin();
+
+            if (block != null)
+                return block;
+
+            row = row?.Trim() ?? "";
+            photoId = photoId?.Trim() ?? "";
+            photoPath = photoPath?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(row) ||
+                string.IsNullOrWhiteSpace(photoId))
+            {
+                return BadRequest();
+            }
+
+            await DeleteCell(
+                row,
+                $"info:life_photo_{photoId}"
+            );
+
+            await DeleteCell(
+                row,
+                $"info:life_photo_note_{photoId}"
+            );
+
+            // 刪除實體圖片
+            if (!string.IsNullOrWhiteSpace(photoPath))
+            {
+                try
+                {
+                    string relativePath =
+                        photoPath
+                            .TrimStart('/')
+                            .Replace(
+                                '/',
+                                Path.DirectorySeparatorChar
+                            );
+
+                    string wwwroot =
+                        Path.GetFullPath(
+                            Path.Combine(
+                                Directory.GetCurrentDirectory(),
+                                "wwwroot"
+                            )
+                        );
+
+                    string fullPath =
+                        Path.GetFullPath(
+                            Path.Combine(
+                                wwwroot,
+                                relativePath
+                            )
+                        );
+
+                    if (fullPath.StartsWith(
+                            wwwroot,
+                            StringComparison.OrdinalIgnoreCase)
+                        &&
+                        System.IO.File.Exists(fullPath))
+                    {
+                        System.IO.File.Delete(fullPath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "刪除生前照片實體檔案失敗。Row={Row}",
+                        row
+                    );
+                }
+            }
+
+            TempData["Message"] =
+                "生前照片刪除成功。";
+
+            TempData["MessageType"] =
+                "success";
+
+            return RedirectToAction(
+                "LifePhotos",
+                new { row }
+            );
+        }
+
+        [HttpGet]
+        public IActionResult ForgotPassword()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ForgotPassword(
+    string role,
+    string loginId,
+    string email,
+    string newPassword,
+    string confirmPassword)
+        {
+            role = role?.Trim() ?? "";
+            loginId = loginId?.Trim() ?? "";
+            email = email?.Trim() ?? "";
+            newPassword = newPassword ?? "";
+            confirmPassword = confirmPassword ?? "";
+
+            if (role != "Teacher" &&
+                role != "Student")
+            {
+                TempData["Message"] =
+                    "僅老師與學生可以使用忘記密碼功能。";
+
+                return RedirectToAction(
+                    "ForgotPassword"
+                );
+            }
+
+            if (string.IsNullOrWhiteSpace(loginId) ||
+                string.IsNullOrWhiteSpace(email) ||
+                string.IsNullOrWhiteSpace(newPassword) ||
+                string.IsNullOrWhiteSpace(confirmPassword))
+            {
+                TempData["Message"] =
+                    "所有欄位都必須輸入。";
+
+                return RedirectToAction(
+                    "ForgotPassword"
+                );
+            }
+
+            if (newPassword != confirmPassword)
+            {
+                TempData["Message"] =
+                    "兩次輸入的密碼不一致。";
+
+                return RedirectToAction(
+                    "ForgotPassword"
+                );
+            }
+
+            var users = LoadUsers();
+
+            var user = users.FirstOrDefault(x =>
+                x.Role == role &&
+                x.LoginId == loginId &&
+                string.Equals(
+                    x.Email,
+                    email,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+
+            if (user == null)
+            {
+                TempData["Message"] =
+                    "帳號、身分或 Email 不正確。";
+
+                return RedirectToAction(
+                    "ForgotPassword"
+                );
+            }
+
+            user.PasswordHash =
+                HashPassword(newPassword);
+
+            SaveUsers(users);
+
+            TempData["Message"] =
+                "密碼重設成功，請使用新密碼登入。";
+
+            return RedirectToAction("Login");
+        }
 
         // 登入/註冊
         private string UserFilePath =>
@@ -2382,53 +2879,80 @@ namespace HBaseMVC.Controllers
         public IActionResult Register(
     string role,
     string loginId,
+    string email,
     string password,
     string confirmPassword,
     string captcha)
         {
-            string? realCaptcha = HttpContext.Session.GetString("Captcha");
+            string? realCaptcha =
+                HttpContext.Session.GetString("Captcha");
+
+            role = role?.Trim() ?? "";
+            loginId = loginId?.Trim() ?? "";
+            email = email?.Trim() ?? "";
+            password = password ?? "";
+            confirmPassword = confirmPassword ?? "";
+            captcha = captcha?.Trim() ?? "";
 
             if (string.IsNullOrWhiteSpace(role) ||
                 string.IsNullOrWhiteSpace(loginId) ||
+                string.IsNullOrWhiteSpace(email) ||
                 string.IsNullOrWhiteSpace(password) ||
                 string.IsNullOrWhiteSpace(confirmPassword) ||
                 string.IsNullOrWhiteSpace(captcha))
             {
-                TempData["Message"] = "所有欄位都必須輸入";
+                TempData["Message"] =
+                    "所有欄位都必須輸入";
+
                 return RedirectToAction("Register");
             }
 
-            if (realCaptcha == null || captcha.ToUpper() != realCaptcha.ToUpper())
+            if (realCaptcha == null ||
+                captcha.ToUpper() != realCaptcha.ToUpper())
             {
-                TempData["Message"] = "驗證碼錯誤";
+                TempData["Message"] =
+                    "驗證碼錯誤";
+
                 return RedirectToAction("Register");
             }
 
             if (password != confirmPassword)
             {
-                TempData["Message"] = "兩次密碼不一致";
+                TempData["Message"] =
+                    "兩次密碼不一致";
+
                 return RedirectToAction("Register");
             }
 
             if (role != "Student")
             {
-                TempData["Message"] = "老師帳號必須由管理員建立";
+                TempData["Message"] =
+                    "老師帳號必須由管理員建立";
+
                 return RedirectToAction("Register");
             }
 
             if (!loginId.All(char.IsDigit))
             {
-                TempData["Message"] = "學生請輸入學號，只能包含數字";
+                TempData["Message"] =
+                    "學生請輸入學號，只能包含數字";
+
                 return RedirectToAction("Register");
             }
 
             var users = LoadUsers();
 
-            bool exists = users.Any(x => x.Role == role && x.LoginId == loginId);
+            bool exists =
+                users.Any(x =>
+                    x.Role == role &&
+                    x.LoginId == loginId
+                );
 
             if (exists)
             {
-                TempData["Message"] = "此帳號已存在";
+                TempData["Message"] =
+                    "此帳號已存在";
+
                 return RedirectToAction("Register");
             }
 
@@ -2436,18 +2960,23 @@ namespace HBaseMVC.Controllers
             {
                 Role = "Student",
                 LoginId = loginId,
-                PasswordHash = HashPassword(password)
+                Email = email,
+                PasswordHash =
+                    HashPassword(password)
             });
 
             SaveUsers(users);
 
-            TempData["Message"] = "註冊成功，請登入";
+            TempData["Message"] =
+                "註冊成功，請登入";
+
             return RedirectToAction("Login");
         }
 
         public IActionResult Logout()
         {
             HttpContext.Session.Clear();
+
             return RedirectToAction("Login");
         }
 
@@ -2494,16 +3023,18 @@ namespace HBaseMVC.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult CreateTeacherAccount(
-            string loginId,
-            string password,
-            string confirmPassword,
-            string captcha)
+    string loginId,
+    string email,
+    string password,
+    string confirmPassword,
+    string captcha)
         {
             var block = RequireAdmin();
             if (block != null)
                 return block;
 
             loginId = loginId?.Trim() ?? "";
+            email = email?.Trim() ?? "";
             password ??= "";
             confirmPassword ??= "";
             captcha = captcha?.Trim() ?? "";
@@ -2512,9 +3043,10 @@ namespace HBaseMVC.Controllers
                 HttpContext.Session.GetString("TeacherCaptcha");
 
             if (string.IsNullOrWhiteSpace(loginId) ||
-                string.IsNullOrWhiteSpace(password) ||
-                string.IsNullOrWhiteSpace(confirmPassword) ||
-                string.IsNullOrWhiteSpace(captcha))
+    string.IsNullOrWhiteSpace(email) ||
+    string.IsNullOrWhiteSpace(password) ||
+    string.IsNullOrWhiteSpace(confirmPassword) ||
+    string.IsNullOrWhiteSpace(captcha))
             {
                 TempData["Message"] = "所有欄位都必須輸入";
                 TempData["MessageType"] = "error";
@@ -2581,6 +3113,7 @@ namespace HBaseMVC.Controllers
             {
                 Role = "Teacher",
                 LoginId = loginId,
+                Email = email,
                 PasswordHash = HashPassword(password)
             });
 

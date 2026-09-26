@@ -235,58 +235,21 @@
         </form>
 
         <div class="link-row">
-            尚未有帳號？
-            <a href="/Home/Register">
-                前往註冊
-            </a>
-        </div>
+    尚未有帳號？
 
-        <div class="link-row">
-            忘記密碼？
-            <a href="javascript:void(0);"
-               onclick="toggleForgotPassword()">
-                密碼重設
-            </a>
-        </div>
+    <a href="@Url.Action("Register", "Home")">
+        前往註冊
+    </a>
+</div>
 
-        <div id="forgot-password-info"
-             style="
-            display:none;
-            margin-top:12px;
-            padding:12px 14px;
-            border:1px solid #fecaca;
-            border-radius:8px;
-            background:#fef2f2;
-            color:#dc2626;
-            font-size:13px;
-            line-height:1.8;
-            text-align:left;">
+<div class="link-row">
+    忘記密碼？
 
-            若忘記登入密碼，請聯絡系統管理員協助重設。<br />
-            學生請提供學號，老師請提供教職員編號。
-
-        </div>
+    <a href="@Url.Action("ForgotPassword", "Home")">
+        密碼重設
+    </a>
+</div>
     </div>
-    <script>
-            function toggleForgotPassword() {
-                const info =
-                    document.getElementById(
-                        'forgot-password-info'
-                    );
-
-                if (!info) {
-                    return;
-                }
-
-                if (info.style.display === 'none' ||
-                    info.style.display === '') {
-
-                    info.style.display = 'block';
-                }
-                else {
-                    info.style.display = 'none';
-                }
-            }
-    </script>
+    
 </body>
 </html>

@@ -2,56 +2,73 @@
   {
     "Role": "Student",
     "LoginId": "112316150",
+    "Email": "",
     "PasswordHash": "03AC674216F3E15C761EE1A5E255F067953623C8B388B4459E13F978D7C846F4"
   },
   {
     "Role": "Teacher",
     "LoginId": "T2026005",
+    "Email": "",
     "PasswordHash": "6A95BBAB63D587B596398C4BD7E91A132F24032D2007D107E5EA71967724B092"
   },
   {
     "Role": "Student",
     "LoginId": "112316114",
+    "Email": "",
     "PasswordHash": "F6E0A1E2AC41945A9AA7FF8A8AAA0CEBC12A3BCC981A929AD5CF810A090E11AE"
   },
   {
     "Role": "Student",
     "LoginId": "123456",
+    "Email": "",
     "PasswordHash": "4FC82B26AECB47D2868C4EFBE3581732A3E7CBCC6C2EFB32062C08170A05EEB8"
   },
   {
     "Role": "Teacher",
     "LoginId": "123456",
+    "Email": "",
     "PasswordHash": "4FC82B26AECB47D2868C4EFBE3581732A3E7CBCC6C2EFB32062C08170A05EEB8"
   },
   {
     "Role": "Teacher",
     "LoginId": "0723",
+    "Email": "",
     "PasswordHash": "41177165EDDB7D6D754A4F8E6F9758CF06F052C1B2448BD9B5E5E292CE38EA74"
   },
   {
     "Role": "Admin",
     "LoginId": "admin",
+    "Email": "",
     "PasswordHash": "C6512B2C77D7A56BE704E93A770DC06EE38533DEE5C751218160BED0C32C9937"
   },
   {
     "Role": "Teacher",
     "LoginId": "T2026006",
+    "Email": "",
     "PasswordHash": "4A38F845458E02C88ADA6A1435DB2A1BD37FB2DFFC0847E1B267F351A9AECE17"
   },
   {
     "Role": "Student",
     "LoginId": "0809",
+    "Email": "",
     "PasswordHash": "2A836B1CE039AEE19705AD78647257B58FC031BD704229B7B4C5CCC19E7E041D"
   },
   {
     "Role": "Student",
     "LoginId": "112316115",
+    "Email": "",
     "PasswordHash": "D1FBE7BB2A83317790C6282C62113B00B73224282BE52E5AB56F68CB898C86FC"
   },
   {
     "Role": "Student",
     "LoginId": "1111",
+    "Email": "",
     "PasswordHash": "EF797C8118F02DFB649607DD5D3F8C7623048C9C063D532CC95C5ED7A898A64F"
+  },
+  {
+    "Role": "Student",
+    "LoginId": "112316152",
+    "Email": "112316137@gms.tcu.edu.tw",
+    "PasswordHash": "1718C24B10AEB8099E3FC44960AB6949AB76A267352459F203EA1036BEC382C2"
   }
 ]

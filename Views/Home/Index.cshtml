@@ -2394,7 +2394,22 @@ td, th {
                                                                   )">
                                                         病歷
                                                     </a>
-
+                                                   <a class="btn btn-xs btn-warning"
+                                                   href="@Url.Action(
+                                                   "LifePhotos",
+                                                   "Home",
+                                                    new { row = item.RowKey }
+                                                    )">
+                                                    生前照片
+                                                   </a>
+                                                   <a class="btn btn-xs btn-warning"
+                                                    href="@Url.Action(
+                                                    "LifePhotos",
+                                                    "Home",
+                                                     new { row = item.RowKey }
+                                                     )">
+                                                    生前照片
+                                                   </a>
                                                     @if (isTeacher)
                                                     {
                                                         <button type="button"

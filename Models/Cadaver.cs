@@ -103,6 +103,15 @@
         // info:fhir_patient_updated_at 或 fhir:patient_updated_at
         public string PatientLastUpdated { get; set; } = "";
 
+        public List<string> LifePhotoIds { get; set; }
+            = new List<string>();
+
+        public List<string> LifePhotoPaths { get; set; }
+            = new List<string>();
+
+        public List<string> LifePhotoNotes { get; set; }
+            = new List<string>();
+
         // lab_test:test_date
         public string LabTestDate { get; set; } = "";
 

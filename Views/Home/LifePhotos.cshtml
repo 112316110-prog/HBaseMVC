@@ -1,0 +1,331 @@
+﻿@using Microsoft.AspNetCore.Http
+@model HBaseMVC.Models.Cadaver
+
+@{
+    Layout = null;
+
+    string role =
+        Context.Session.GetString("Role")
+        ?? "";
+
+    bool isAdmin =
+        role == "Admin";
+}
+
+<!DOCTYPE html>
+
+<html lang="zh-TW">
+
+<head>
+
+    <meta charset="utf-8" />
+
+    <title>大體老師生前照片</title>
+
+    <style>
+
+        body {
+            font-family: "Noto Sans TC", sans-serif;
+            background: #f6f7f9;
+            margin: 0;
+            padding: 30px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .header h2 {
+            margin: 0;
+        }
+
+        .header-spacer {
+            flex: 1;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            background: white;
+            text-decoration: none;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+            border-color: #dc2626;
+        }
+
+        .photo-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    auto-fill,
+                    minmax(280px, 1fr)
+                );
+
+            gap: 20px;
+        }
+
+        .photo-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .photo-card img {
+            width: 100%;
+            height: 240px;
+            object-fit: contain;
+            background: #f8fafc;
+            border-radius: 6px;
+        }
+
+        .photo-note {
+            margin-top: 10px;
+            line-height: 1.6;
+        }
+
+        textarea {
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 8px;
+            padding: 8px;
+        }
+
+        .admin-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .upload-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 10px;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+
+        <h2>
+            大體老師生前照片
+            — @Model.RowKey
+        </h2>
+
+        <div class="header-spacer"></div>
+
+        <a class="btn"
+           href="@Url.Action(
+               "Index",
+               "Home",
+               new { panel = "list" }
+           )">
+            返回資料列表
+        </a>
+
+    </div>
+
+
+    @if (isAdmin)
+    {
+        <div class="upload-card">
+
+            <h3>新增生前照片</h3>
+
+            <form method="post"
+                  enctype="multipart/form-data"
+                  action="@Url.Action(
+                      "UploadLifePhoto",
+                      "Home"
+                  )">
+
+                @Html.AntiForgeryToken()
+
+                <input type="hidden"
+                       name="row"
+                       value="@Model.RowKey" />
+
+                <input type="file"
+                       name="photo"
+                       accept=".jpg,.jpeg,.png"
+                       required />
+
+                <br /><br />
+
+                <textarea name="note"
+                          placeholder="照片說明"
+                          rows="3"></textarea>
+
+                <br /><br />
+
+                <button type="submit"
+                        class="btn btn-primary">
+                    新增照片
+                </button>
+
+            </form>
+
+        </div>
+    }
+
+
+    @if (Model.LifePhotoPaths == null ||
+         Model.LifePhotoPaths.Count == 0)
+    {
+        <div class="photo-card">
+            目前尚無生前照片。
+        </div>
+    }
+    else
+    {
+        <div class="photo-grid">
+
+            @for (
+                int i = 0;
+                i < Model.LifePhotoPaths.Count;
+                i++)
+            {
+                string id =
+                    i < Model.LifePhotoIds.Count
+                    ? Model.LifePhotoIds[i]
+                    : "";
+
+                string path =
+                    Model.LifePhotoPaths[i];
+
+                string note =
+                    i < Model.LifePhotoNotes.Count
+                    ? Model.LifePhotoNotes[i]
+                    : "";
+
+                <div class="photo-card">
+
+                    <img src="@path"
+                         alt="大體老師生前照片" />
+
+                    @if (isAdmin)
+                    {
+                        <form method="post"
+                              action="@Url.Action(
+                                  "UpdateLifePhoto",
+                                  "Home"
+                              )">
+
+                            @Html.AntiForgeryToken()
+
+                            <input type="hidden"
+                                   name="row"
+                                   value="@Model.RowKey" />
+
+                            <input type="hidden"
+                                   name="photoId"
+                                   value="@id" />
+
+                            <textarea name="note"
+                                      rows="3">@note</textarea>
+
+                            <div class="admin-actions">
+
+                                <button type="submit"
+                                        class="btn btn-primary">
+                                    修改
+                                </button>
+
+                            </div>
+
+                        </form>
+
+
+                        <form method="post"
+                              action="@Url.Action(
+                                  "DeleteLifePhoto",
+                                  "Home"
+                              )"
+                              onsubmit="
+                                  return confirm(
+                                  '確定要刪除這張生前照片嗎？'
+                                  );
+                              ">
+
+                            @Html.AntiForgeryToken()
+
+                            <input type="hidden"
+                                   name="row"
+                                   value="@Model.RowKey" />
+
+                            <input type="hidden"
+                                   name="photoId"
+                                   value="@id" />
+
+                            <input type="hidden"
+                                   name="photoPath"
+                                   value="@path" />
+
+                            <button type="submit"
+                                    class="btn btn-danger">
+                                刪除
+                            </button>
+
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="photo-note">
+
+                            @if (
+                                string.IsNullOrWhiteSpace(
+                                    note
+                                ))
+                            {
+                                <span>
+                                    無照片說明
+                                </span>
+                            }
+                            else
+                            {
+                                @note
+                            }
+
+                        </div>
+                    }
+
+                </div>
+            }
+
+        </div>
+    }
+
+</div>
+
+</body>
+
+</html>
