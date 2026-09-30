@@ -36,6 +36,10 @@
 
         public string Status { get; set; } = "Pending";
 
+        public string Students { get; set; } = "";
+
+        public string ApprovedBy { get; set; } = "";
+
         // 之後管理員回覆用
         public string ApprovedTime { get; set; } = "";
 
