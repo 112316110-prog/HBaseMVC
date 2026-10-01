@@ -3702,6 +3702,70 @@ namespace HBaseMVC.Controllers
                         {
                             item.CadaverRowKey = value;
                         }
+                        else if (column == "schedule:group_name")
+                        {
+                            item.GroupName = value;
+                        }
+                        else if (column == "schedule:age")
+                        {
+                            item.Age = value;
+                        }
+                        else if (column == "schedule:medical_history")
+                        {
+                            item.MedicalHistory = value;
+                        }
+                        else if (column == "schedule:diagnosis")
+                        {
+                            item.Diagnosis = value;
+                        }
+                        else if (column == "schedule:department")
+                        {
+                            item.Department = value;
+                        }
+                        else if (column == "schedule:students")
+                        {
+                            item.Students = value;
+                        }
+                        else if (column == "schedule:main_doctor")
+                        {
+                            item.MainDoctor = value;
+                        }
+                        else if (column == "schedule:assistant")
+                        {
+                            item.Assistant = value;
+                        }
+                        else if (column == "schedule:nurse")
+                        {
+                            item.Nurse = value;
+                        }
+                        else if (column == "schedule:course_content")
+                        {
+                            item.CourseContent = value;
+                        }
+                        else if (column == "schedule:surgery_topic")
+                        {
+                            item.SurgeryTopic = value;
+                        }
+                        else if (column == "schedule:procedure")
+                        {
+                            item.Procedure = value;
+                        }
+                        else if (column == "schedule:body_part")
+                        {
+                            item.BodyPart = value;
+                        }
+                        else if (column == "schedule:application_row_key")
+                        {
+                            item.ApplicationRowKey = value;
+                        }
+                        else if (column == "schedule:approved_by")
+                        {
+                            item.ApprovedBy = value;
+                        }
+                        else if (column == "schedule:approved_time")
+                        {
+                            item.ApprovedTime = value;
+                        }
                     }
 
                     result.Add(item);
@@ -3904,6 +3968,16 @@ namespace HBaseMVC.Controllers
                                     value;
                                 break;
 
+                            case "info:students":
+                                item.Students =
+                                    value;
+                                break;
+
+                            case "info:approved_by":
+                                item.ApprovedBy =
+                                    value;
+                                break;
+
                             case "info:approved_time":
                                 item.ApprovedTime =
                                     value;
@@ -3961,6 +4035,7 @@ namespace HBaseMVC.Controllers
                 ?? "";
 
             if (role != "Teacher" &&
+                role != "Student" &&
                 role != "Admin")
             {
                 return Forbid();
@@ -3985,8 +4060,12 @@ namespace HBaseMVC.Controllers
             // =========================
             // Admin：不可建立空白申請
             // =========================
-            if (role == "Admin" &&
-                string.IsNullOrWhiteSpace(rowKey))
+            if (
+      (role == "Admin" ||
+       role == "Student")
+      &&
+      string.IsNullOrWhiteSpace(rowKey)
+  )
             {
                 return RedirectToAction(
                     "TeachingApplicationReport"
@@ -4046,7 +4125,13 @@ var application =
             }
 
             var applications =
-                await GetTeachingApplications();
+    await GetTeachingApplications();
+
+            ViewBag.SurgicalTables =
+                await GetSurgicalTables();
+
+            ViewBag.Cadavers =
+                await GetAllData();
 
             return View(applications);
         }
@@ -4207,6 +4292,286 @@ var application =
                 TempData["MessageType"] =
                     "error";
             }
+
+            return RedirectToAction(
+                "TeachingApplicationReport"
+            );
+        }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveTeachingApplication(
+    string rowKey,
+    string tableId,
+    string cadaverRowKey,
+    string adminReply)
+        {
+            var block =
+                RequireAdmin();
+
+            if (block != null)
+                return block;
+
+            rowKey =
+                rowKey?.Trim() ?? "";
+
+            tableId =
+                tableId?.Trim() ?? "";
+
+            cadaverRowKey =
+                cadaverRowKey?.Trim() ?? "";
+
+            adminReply =
+                adminReply?.Trim() ?? "";
+
+            string approvedBy =
+                HttpContext.Session
+                    .GetString("LoginId")
+                ?? "";
+
+            if (string.IsNullOrWhiteSpace(rowKey))
+            {
+                TempData["Message"] =
+                    "審核失敗：缺少申請編號。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "TeachingApplicationReport"
+                );
+            }
+            if (string.IsNullOrWhiteSpace(tableId) ||
+                 string.IsNullOrWhiteSpace(cadaverRowKey))
+            {
+                TempData["Message"] =
+                    "核准排課失敗：請選擇手術台與大體老師。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "TeachingApplicationReport"
+                );
+            }
+
+            List<TeachingApplication> applications =
+                await GetTeachingApplications();
+
+            TeachingApplication? application =
+                applications.FirstOrDefault(x =>
+                    string.Equals(
+                        x.RowKey,
+                        rowKey,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+
+            if (application == null)
+            {
+                TempData["Message"] =
+                    "找不到指定的申請。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "TeachingApplicationReport"
+                );
+            }
+
+            if (!DateTime.TryParse(
+                    application.ClassTime,
+                    out DateTime classDateTime))
+            {
+                TempData["Message"] =
+                    "申請中的預計時間格式錯誤。";
+
+                TempData["MessageType"] =
+                    "error";
+
+                return RedirectToAction(
+                    "TeachingApplicationReport"
+                );
+            }
+
+            string approvedTime =
+                DateTime.Now.ToString(
+                    "yyyy-MM-dd HH:mm:ss"
+                );
+
+            string classDate =
+                classDateTime.ToString(
+                    "yyyy-MM-dd"
+                );
+
+            // 更新申請狀態
+            string xml = $@"
+<CellSet>
+  <Row key=""{ToBase64(rowKey)}"">
+
+    <Cell column=""{ToBase64("info:status")}"">
+        {ToBase64("Approved")}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:approved_by")}"">
+        {ToBase64(approvedBy)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:approved_time")}"">
+        {ToBase64(approvedTime)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:table_id")}"">
+        {ToBase64(tableId)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:cadaver_row_key")}"">
+        {ToBase64(cadaverRowKey)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:admin_reply")}"">
+        {ToBase64(adminReply)}
+    </Cell>
+
+  </Row>
+</CellSet>";
+
+            HttpResponseMessage response =
+                await _client.PutAsync(
+                    $"teaching_application/{Uri.EscapeDataString(rowKey)}",
+                    new StringContent(
+                        xml,
+                        Encoding.UTF8,
+                        "text/xml"
+                    )
+                );
+
+            response.EnsureSuccessStatusCode();
+
+            // 建立正式 class_schedule
+            string classSessionId =
+                "CLASS_" +
+                classDate.Replace("-", "") +
+                "_" +
+                Guid.NewGuid()
+                    .ToString("N")
+                    .Substring(0, 8);
+
+            string scheduleRowKey =
+                "SCHEDULE_" +
+                Guid.NewGuid()
+                    .ToString("N");
+
+            await PutClassScheduleRow(
+                scheduleRowKey,
+                classSessionId,
+                classDate,
+                tableId,
+                cadaverRowKey,
+                application.GroupName,
+                application.Age,
+                application.MedicalHistory,
+                application.Diagnosis,
+                application.Department,
+                application.Students,
+                application.MainDoctor,
+                application.Assistant,
+                application.Nurse,
+                application.CourseContent,
+                application.SurgeryTopic,
+                application.Procedure,
+                application.BodyPart,
+                application.RowKey,
+                approvedBy,
+                approvedTime
+            );
+
+            TempData["Message"] =
+                "申請已核准並完成排課。";
+
+            TempData["MessageType"] =
+                "success";
+
+            return RedirectToAction(
+                "TeachingApplicationReport"
+            );
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RejectTeachingApplication(
+    string rowKey,
+    string adminReply)
+        {
+            var block =
+                RequireAdmin();
+
+            if (block != null)
+                return block;
+
+            rowKey =
+                rowKey?.Trim() ?? "";
+
+            adminReply =
+                adminReply?.Trim() ?? "";
+
+            string approvedBy =
+                HttpContext.Session
+                    .GetString("LoginId")
+                ?? "";
+
+            string approvedTime =
+                DateTime.Now.ToString(
+                    "yyyy-MM-dd HH:mm:ss"
+                );
+
+            if (string.IsNullOrWhiteSpace(rowKey))
+            {
+                return RedirectToAction(
+                    "TeachingApplicationReport"
+                );
+            }
+
+            string xml = $@"
+<CellSet>
+  <Row key=""{ToBase64(rowKey)}"">
+
+    <Cell column=""{ToBase64("info:status")}"">
+        {ToBase64("Rejected")}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:approved_by")}"">
+        {ToBase64(approvedBy)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:approved_time")}"">
+        {ToBase64(approvedTime)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:admin_reply")}"">
+        {ToBase64(adminReply)}
+    </Cell>
+
+  </Row>
+</CellSet>";
+
+            HttpResponseMessage response =
+                await _client.PutAsync(
+                    $"teaching_application/{Uri.EscapeDataString(rowKey)}",
+                    new StringContent(
+                        xml,
+                        Encoding.UTF8,
+                        "text/xml"
+                    )
+                );
+
+            response.EnsureSuccessStatusCode();
+
+            TempData["Message"] =
+                "申請已退回。";
+
+            TempData["MessageType"] =
+                "success";
 
             return RedirectToAction(
                 "TeachingApplicationReport"
@@ -4389,7 +4754,23 @@ var application =
     string classSessionId,
     string classDate,
     string tableId,
-    string cadaverRowKey)
+    string cadaverRowKey,
+    string groupName,
+    string age,
+    string medicalHistory,
+    string diagnosis,
+    string department,
+    string students,
+    string mainDoctor,
+    string assistant,
+    string nurse,
+    string courseContent,
+    string surgeryTopic,
+    string procedure,
+    string bodyPart,
+    string applicationRowKey,
+    string approvedBy,
+    string approvedTime)
         {
             string xml = $@"
 <CellSet>
@@ -4410,6 +4791,70 @@ var application =
     <Cell column=""{ToBase64("schedule:cadaver_row_key")}"">
         {ToBase64(cadaverRowKey)}
     </Cell>
+
+<Cell column=""{ToBase64("schedule:group_name")}"">
+    {ToBase64(groupName)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:age")}"">
+    {ToBase64(age)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:medical_history")}"">
+    {ToBase64(medicalHistory)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:diagnosis")}"">
+    {ToBase64(diagnosis)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:department")}"">
+    {ToBase64(department)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:students")}"">
+    {ToBase64(students)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:main_doctor")}"">
+    {ToBase64(mainDoctor)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:assistant")}"">
+    {ToBase64(assistant)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:nurse")}"">
+    {ToBase64(nurse)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:course_content")}"">
+    {ToBase64(courseContent)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:surgery_topic")}"">
+    {ToBase64(surgeryTopic)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:procedure")}"">
+    {ToBase64(procedure)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:body_part")}"">
+    {ToBase64(bodyPart)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:application_row_key")}"">
+    {ToBase64(applicationRowKey)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:approved_by")}"">
+    {ToBase64(approvedBy)}
+</Cell>
+
+<Cell column=""{ToBase64("schedule:approved_time")}"">
+    {ToBase64(approvedTime)}
+</Cell>
 
   </Row>
 </CellSet>";
@@ -18490,7 +18935,23 @@ var application =
                 classSessionId,
                 classDate,
                 tableId,
-                cadaverRowKey
+                cadaverRowKey,
+                "", // groupName
+    "", // age
+    "", // medicalHistory
+    "", // diagnosis
+    "", // department
+    "", // students
+    "", // mainDoctor
+    "", // assistant
+    "", // nurse
+    "", // courseContent
+    "", // surgeryTopic
+    "", // procedure
+    "", // bodyPart
+    "", // applicationRowKey
+    "", // approvedBy
+    ""  // approvedTime
             );
 
             TempData["Message"] =
@@ -18513,6 +18974,7 @@ var application =
     string medicalHistory,
     string diagnosis,
     string department,
+    string students,
     string assistant,
     string mainDoctor,
     string nurse,
@@ -18561,6 +19023,9 @@ var application =
 
             department =
                 department?.Trim() ?? "";
+
+            students =
+                students?.Trim() ?? "";
 
             assistant =
                 assistant?.Trim() ?? "";
@@ -18664,6 +19129,10 @@ var application =
 
     <Cell column=""{ToBase64("info:department")}"">
       {ToBase64(department)}
+    </Cell>
+
+    <Cell column=""{ToBase64("info:students")}"">
+     {ToBase64(students)}
     </Cell>
 
     <Cell column=""{ToBase64("info:assistant")}"">

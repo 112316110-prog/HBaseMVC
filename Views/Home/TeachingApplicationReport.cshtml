@@ -13,9 +13,23 @@
     string loginId =
         Context.Session.GetString("LoginId") ?? "";
 
-    bool canViewApplication =
-        role == "Teacher" ||
-        role == "Admin";
+bool canViewApplication =
+    role == "Teacher" ||
+    role == "Student" ||
+    role == "Admin";
+
+bool canManage =
+    role == "Admin";
+
+var surgicalTables =
+    ViewBag.SurgicalTables
+        as List<HBaseMVC.Models.SurgicalTable>
+    ?? new List<HBaseMVC.Models.SurgicalTable>();
+
+var cadavers =
+    ViewBag.Cadavers
+        as List<HBaseMVC.Models.Cadaver>
+    ?? new List<HBaseMVC.Models.Cadaver>();
 }
 
 <!DOCTYPE html>
@@ -399,6 +413,10 @@
                             </th>
 
                             <th>
+                                學生
+                            </th>
+
+                            <th>
                                 基本病史
                             </th>
 
@@ -511,17 +529,16 @@
 
 
                                 <td>
-
                                     @item.Department
-
                                 </td>
 
+                               <td class="text-cell">
+                                    @item.Students
+                                </td>
 
                                 <td class="text-cell">
-
                                     @item.MedicalHistory
-
-                                </td>
+                                 </td>
 
 
                                 <td class="text-cell">
@@ -589,72 +606,231 @@
 
                                 @if (canViewApplication)
                                 {
-                                    <td>
+                                   <td>
 
-                                        <div class="action-group">
+        <div class="action-group"
+             style="align-items:flex-start;
+                    flex-wrap:wrap;">
 
-                                            <a class="btn"
-                                               href="@Url.Action(
-                                                   "TeachingApplication",
-                                                   "Home",
-                                                   new
-                                                   {
-                                                       rowKey =
-                                                           item.RowKey
-                                                   }
-                                               )">
-
-                                                查看
-
-                                            </a>
+            <a class="btn"
+               href="@Url.Action(
+                   "TeachingApplication",
+                   "Home",
+                   new
+                   {
+                       rowKey = item.RowKey
+                   }
+               )">
+                查看
+            </a>
 
 
-                                            @if (
-                                                role == "Admin"
-                                                ||
-                                                (
-                                                    role == "Teacher"
-                                                    &&
-                                                    string.Equals(
-                                                        item.Applicant?.Trim(),
-                                                        loginId.Trim(),
-                                                        StringComparison.OrdinalIgnoreCase
-                                                    )
-                                                    &&
-                                                    string.Equals(
-                                                        item.Status,
-                                                        "Pending",
-                                                        StringComparison.OrdinalIgnoreCase
-                                                    )
-                                                )
-                                            )
-                                            {
-                                                <form method="post"
-                                                      action="@Url.Action(
-                                                          "DeleteTeachingApplication",
-                                                          "Home"
-                                                      )"
-                                                      onsubmit="return confirm('確定要刪除這筆教學申請嗎？刪除後無法復原。');">
+            @* =========================================
+               Admin：待審核 → 核准並排課
+               ========================================= *@
+            @if (
+                role == "Admin"
+                &&
+                string.Equals(
+                    item.Status,
+                    "Pending",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                <form method="post"
+                      action="@Url.Action(
+                          "ApproveTeachingApplication",
+                          "Home"
+                      )"
+                      style="
+                          display:flex;
+                          flex-direction:column;
+                          gap:6px;
+                          min-width:230px;
+                      ">
 
-                                                    @Html.AntiForgeryToken()
+                    @Html.AntiForgeryToken()
 
-                                                    <input type="hidden"
-                                                           name="rowKey"
-                                                           value="@item.RowKey" />
+                    <input type="hidden"
+                           name="rowKey"
+                           value="@item.RowKey" />
 
-                                                    <button type="submit"
-                                                            class="btn btn-danger">
 
-                                                        刪除
+                    <select name="tableId"
+                            required
+                            style="
+                                min-height:36px;
+                                border:1px solid #d4d4d4;
+                                border-radius:8px;
+                                padding:0 8px;
+                            ">
 
-                                                    </button>
+                        <option value="">
+                            選擇手術台
+                        </option>
 
-                                                </form>
-                                            }
+                        @foreach (
+                            var table
+                            in surgicalTables
+                                .Where(x => x.IsActive)
+                        )
+                        {
+                            <option value="@table.RowKey">
 
-                                        </div>
+                                @table.TableNumber
+                                @if (!string.IsNullOrWhiteSpace(
+                                    table.TableName))
+                                {
+                                    <text>
+                                        - @table.TableName
+                                    </text>
+                                }
 
-                                    </td>
+                            </option>
+                        }
+
+                    </select>
+
+
+                    <select name="cadaverRowKey"
+                            required
+                            style="
+                                min-height:36px;
+                                border:1px solid #d4d4d4;
+                                border-radius:8px;
+                                padding:0 8px;
+                            ">
+
+                        <option value="">
+                            選擇大體老師
+                        </option>
+
+                        @foreach (
+                            var cadaver
+                            in cadavers
+                                .OrderBy(x => x.RowKey)
+                        )
+                        {
+                            <option value="@cadaver.RowKey">
+                                @cadaver.RowKey
+                            </option>
+                        }
+
+                    </select>
+
+
+                    <input type="text"
+                           name="adminReply"
+                           placeholder="管理員備註"
+                           style="
+                               min-height:36px;
+                               border:1px solid #d4d4d4;
+                               border-radius:8px;
+                               padding:0 8px;
+                           " />
+
+
+                    <button type="submit"
+                            class="btn btn-primary"
+                            onclick="return confirm('確定核准並建立正式排課嗎？');">
+
+                        核准並排課
+
+                    </button>
+
+                </form>
+
+
+                <form method="post"
+                      action="@Url.Action(
+                          "RejectTeachingApplication",
+                          "Home"
+                      )"
+                      style="
+                          display:flex;
+                          flex-direction:column;
+                          gap:6px;
+                          min-width:180px;
+                      ">
+
+                    @Html.AntiForgeryToken()
+
+                    <input type="hidden"
+                           name="rowKey"
+                           value="@item.RowKey" />
+
+                    <input type="text"
+                           name="adminReply"
+                           placeholder="退回原因"
+                           required
+                           style="
+                               min-height:36px;
+                               border:1px solid #d4d4d4;
+                               border-radius:8px;
+                               padding:0 8px;
+                           " />
+
+                    <button type="submit"
+                            class="btn btn-danger"
+                            onclick="return confirm('確定退回這筆申請嗎？');">
+
+                        退回
+
+                    </button>
+
+                </form>
+            }
+
+
+            @* =========================================
+               Teacher：只能刪除自己的 Pending
+               Admin：仍可刪除
+               ========================================= *@
+            @if (
+                role == "Admin"
+                ||
+                (
+                    role == "Teacher"
+                    &&
+                    string.Equals(
+                        item.Applicant?.Trim(),
+                        loginId.Trim(),
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                    &&
+                    string.Equals(
+                        item.Status,
+                        "Pending",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+            )
+            {
+                <form method="post"
+                      action="@Url.Action(
+                          "DeleteTeachingApplication",
+                          "Home"
+                      )"
+                      onsubmit="return confirm('確定要刪除這筆教學申請嗎？刪除後無法復原。');">
+
+                    @Html.AntiForgeryToken()
+
+                    <input type="hidden"
+                           name="rowKey"
+                           value="@item.RowKey" />
+
+                    <button type="submit"
+                            class="btn btn-danger">
+                        刪除
+                    </button>
+
+                </form>
+            }
+
+        </div>
+
+    </td>
                                 }
 
                             </tr>
