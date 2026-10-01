@@ -2,7 +2,7 @@
 {
     public class ClassSchedule
     {
-        // HBase RowKeytest123
+        // HBase RowKey
         public string RowKey { get; set; } = "";
 
         // 同一堂課的識別碼
