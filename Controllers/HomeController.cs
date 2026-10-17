@@ -489,6 +489,16 @@ namespace HBaseMVC.Controllers
             }
 
             if (ContainsAny(
+        question,
+        "OCT",
+        "光學同調斷層",
+        "光學同調斷層掃描",
+        "Optical Coherence Tomography"))
+            {
+                return "oct";
+            }
+
+            if (ContainsAny(
                     question,
                     "超音波",
                     "超聲波",
@@ -6270,10 +6280,13 @@ var application =
         }
 
         private static string NormalizeHBaseExaminationType(
-            string examinationType)
+    string examinationType)
         {
             string value =
                 examinationType?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(value))
+                return "";
 
             if (ContainsAny(
                     value,
@@ -6287,14 +6300,95 @@ var application =
 
             if (ContainsAny(
                     value,
+                    "CT",
+                    "電腦斷層",
+                    "Computed Tomography"))
+            {
+                return "ct";
+            }
+
+            if (ContainsAny(
+                    value,
+                    "MRI",
+                    "磁振造影",
+                    "核磁共振",
+                    "磁共振"))
+            {
+                return "mri";
+            }
+
+            if (ContainsAny(
+                    value,
+                    "OCT",
+                    "光學同調斷層",
+                    "光學同調斷層掃描",
+                    "Optical Coherence Tomography"))
+            {
+                return "oct";
+            }
+
+            if (ContainsAny(
+                    value,
+                    "Ultrasound",
                     "超音波",
-                    "超聲波",
-                    "Ultrasound"))
+                    "超聲波"))
             {
                 return "ultrasound";
             }
 
-            return "";
+            if (ContainsAny(
+                    value,
+                    "Pathology",
+                    "Histology",
+                    "病理",
+                    "病理切片",
+                    "組織切片"))
+            {
+                return "pathology";
+            }
+
+            if (ContainsAny(
+                    value,
+                    "Endoscopy",
+                    "內視鏡"))
+            {
+                return "endoscopy";
+            }
+
+            if (ContainsAny(
+                    value,
+                    "Microscopy",
+                    "顯微鏡",
+                    "顯微"))
+            {
+                return "microscopy";
+            }
+
+            if (ContainsAny(
+                    value,
+                    "PET",
+                    "正子"))
+            {
+                return "pet";
+            }
+
+            if (ContainsAny(
+                    value,
+                    "Mammography",
+                    "乳房攝影"))
+            {
+                return "mammography";
+            }
+
+            if (ContainsAny(
+                    value,
+                    "Angiography",
+                    "血管攝影"))
+            {
+                return "angiography";
+            }
+
+            return value.ToLowerInvariant();
         }
 
         private static bool IsLungMediaCategory(
@@ -6850,47 +6944,70 @@ var application =
         Cadaver patient,
         string examinationType)
         {
-            var result =
-                new List<object>();
+            var result = new List<object>();
+
+            if (patient == null)
+                return result;
 
             string normalizedType =
-                NormalizeHBaseExaminationType(
-                    examinationType
-                );
+                NormalizeHBaseExaminationType(examinationType);
 
-            if (normalizedType != "xray"
-                &&
-                normalizedType != "ultrasound")
+            List<string> paths =
+                patient.MedicalImagePaths
+                ?? new List<string>();
+
+            List<string> ids =
+                patient.MedicalImageIds
+                ?? new List<string>();
+
+            List<string> notes =
+                patient.MedicalImageNotes
+                ?? new List<string>();
+
+            List<string> examTypes =
+                patient.MedicalImageExaminationTypes
+                ?? new List<string>();
+
+            for (int i = 0; i < paths.Count; i++)
             {
-                return result;
-            }
+                string path =
+                    paths[i]?.Trim() ?? "";
 
-            List<HBaseMedicalMedia> mediaList =
-                await GetHBaseMedicalMedia(
-                    patient.RowKey,
-                    normalizedType
-                );
+                if (string.IsNullOrWhiteSpace(path))
+                    continue;
 
-            foreach (
-                HBaseMedicalMedia media
-                in mediaList.Take(12))
-            {
-                string imageUrl =
-                    Url.Action(
-                        "HBaseMedicalMediaFile",
-                        "Home",
-                        new
-                        {
-                            mediaId =
-                                media.MediaId
-                        }
-                    )
-                    ?? "";
+                string storedExamType =
+                    i < examTypes.Count
+                        ? examTypes[i]?.Trim() ?? ""
+                        : "";
 
-                string title =
-                    normalizedType == "xray"
-                        ? "肺部 X 光"
-                        : "肺部超音波";
+                string normalizedStoredType =
+                    NormalizeHBaseExaminationType(
+                        storedExamType
+                    );
+
+                if (!string.Equals(
+                        normalizedStoredType,
+                        normalizedType,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string imageId =
+                    i < ids.Count
+                        ? ids[i]
+                        : "";
+
+                string note =
+                    i < notes.Count
+                        ? notes[i]
+                        : "";
+
+                string displayName =
+                    GetExaminationDisplayName(
+                        normalizedType
+                    );
 
                 result.Add(new
                 {
@@ -6898,20 +7015,18 @@ var application =
                         patient.RowKey ?? "",
 
                     medicalRecordNumber =
-                        patient.MedicalRecordNumber
-                        ?? "",
+                        patient.MedicalRecordNumber ?? "",
 
-                    imageId =
-                        media.MediaId,
+                    imageId,
 
                     imagePath =
-                        imageUrl,
+                        path,
 
                     originalImagePath =
-                        imageUrl,
+                        path,
 
                     pageUrl =
-                        imageUrl,
+                        path,
 
                     isAnnotated =
                         false,
@@ -6919,109 +7034,145 @@ var application =
                     imageType =
                         normalizedType,
 
-                    title,
+                    title =
+                        displayName,
 
                     note =
-                        string.IsNullOrWhiteSpace(
-                            media.Note)
-                            ? $"{title}教學影像"
-                            : media.Note,
+                        string.IsNullOrWhiteSpace(note)
+                            ? $"{displayName}影像"
+                            : note,
 
                     source =
-                        "hbase-medical-media"
+                        "cadaver-medical-image"
                 });
+
+                if (result.Count >= 12)
+                    break;
             }
 
             return result;
         }
 
-        private async Task<List<object>>
-    BuildAiHBaseGlobalExaminationImages(
-        string examinationType)
-        {
-            var result =
-                new List<object>();
+       
 
-            string normalizedType =
+
+        private Task<List<object>>
+    BuildAiHBaseGlobalExaminationImages(
+        string examinationType,
+        List<Cadaver> allPatients)
+{
+    var result = new List<object>();
+
+    string normalizedType =
+        NormalizeHBaseExaminationType(
+            examinationType
+        );
+
+    foreach (Cadaver patient in allPatients)
+    {
+        List<string> paths =
+            patient.MedicalImagePaths
+            ?? new List<string>();
+
+        List<string> ids =
+            patient.MedicalImageIds
+            ?? new List<string>();
+
+        List<string> notes =
+            patient.MedicalImageNotes
+            ?? new List<string>();
+
+        List<string> examTypes =
+            patient.MedicalImageExaminationTypes
+            ?? new List<string>();
+
+        for (int i = 0; i < paths.Count; i++)
+        {
+            string path =
+                paths[i]?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(path))
+                continue;
+
+            string storedExamType =
+                i < examTypes.Count
+                    ? examTypes[i]?.Trim() ?? ""
+                    : "";
+
+            string normalizedStoredType =
                 NormalizeHBaseExaminationType(
-                    examinationType
+                    storedExamType
                 );
 
-            if (normalizedType != "xray"
-                &&
-                normalizedType != "ultrasound")
+            if (!string.Equals(
+                    normalizedStoredType,
+                    normalizedType,
+                    StringComparison.OrdinalIgnoreCase))
             {
-                return result;
+                continue;
             }
 
-            List<HBaseMedicalMedia> mediaList =
-                await GetHBaseMedicalMedia(
-                    "",
+            string imageId =
+                i < ids.Count
+                    ? ids[i]
+                    : "";
+
+            string note =
+                i < notes.Count
+                    ? notes[i]
+                    : "";
+
+            string displayName =
+                GetExaminationDisplayName(
                     normalizedType
                 );
 
-            foreach (
-                HBaseMedicalMedia media
-                in mediaList.Take(12))
+            result.Add(new
             {
-                string imageUrl =
-                    Url.Action(
-                        "HBaseMedicalMediaFile",
-                        "Home",
-                        new
-                        {
-                            mediaId =
-                                media.MediaId
-                        }
-                    )
-                    ?? "";
+                patientRowKey =
+                    patient.RowKey ?? "",
 
-                string title =
-                    normalizedType == "xray"
-                        ? "肺部 X 光"
-                        : "肺部超音波";
+                medicalRecordNumber =
+                    patient.MedicalRecordNumber ?? "",
 
-                result.Add(new
-                {
-                    patientRowKey =
-                        media.PatientRowKey ?? "",
+                imageId,
 
-                    medicalRecordNumber =
-                        "",
+                imagePath =
+                    path,
 
-                    imageId =
-                        media.MediaId,
+                originalImagePath =
+                    path,
 
-                    imagePath =
-                        imageUrl,
+                pageUrl =
+                    path,
 
-                    originalImagePath =
-                        imageUrl,
+                isAnnotated =
+                    false,
 
-                    pageUrl =
-                        imageUrl,
+                imageType =
+                    normalizedType,
 
-                    isAnnotated =
-                        false,
+                title =
+                    displayName,
 
-                    imageType =
-                        normalizedType,
+                note =
+                    string.IsNullOrWhiteSpace(note)
+                        ? $"{displayName}影像"
+                        : note,
 
-                    title,
+                source =
+                    "cadaver-medical-image"
+            });
 
-                    note =
-                        string.IsNullOrWhiteSpace(
-                            media.Note)
-                            ? $"{title}教學影像"
-                            : media.Note,
-
-                    source =
-                        "hbase-medical-media"
-                });
-            }
-
-            return result;
+            if (result.Count >= 12)
+                return Task.FromResult(result);
         }
+    }
+
+    return Task.FromResult(result);
+}
+
+
 
         private async Task<List<object>>
             BuildAiAllHBasePatientImages(
@@ -10171,6 +10322,7 @@ var application =
                 "pet" => "PET 正子斷層",
                 "mammography" => "乳房攝影",
                 "angiography" => "血管攝影",
+                "oct" => "OCT 光學同調斷層掃描",
                 _ => "檢查"
             };
         }
@@ -11229,12 +11381,13 @@ var application =
             if (intent.Intent ==
                 "examination_image_query")
             {
-                List<object> images =
-                    await BuildAiHBaseGlobalExaminationImages(
-                        intent.ExaminationType
-                    );
+        List<object> images =
+await BuildAiHBaseGlobalExaminationImages(
+intent.ExaminationType,
+allPatients
+);
 
-                string displayName =
+        string displayName =
                     GetExaminationDisplayName(
                         intent.ExaminationType
                     );
