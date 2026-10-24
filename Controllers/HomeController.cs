@@ -2695,7 +2695,7 @@ namespace HBaseMVC.Controllers
             {
                 Role = "Admin",
                 LoginId = "admin",
-                PasswordHash = HashPassword("7GWbYGdEDY")
+                PasswordHash = HashPassword("88888888")
             }
         };
 
